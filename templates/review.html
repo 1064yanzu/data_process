@@ -1,0 +1,860 @@
+{% extends "base.html" %}
+
+{% block title %}人工复核 - 情感分析系统{% endblock %}
+
+{% block head %}
+<style>
+    .review-card {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .review-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 40px rgba(31, 38, 135, 0.4);
+    }
+    
+    .text-content {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        padding: 1.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 15px;
+        margin-bottom: 1rem;
+        word-wrap: break-word;
+    }
+    
+    .prediction-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .prediction-positive {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+    }
+    
+    .prediction-negative {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+    }
+    
+    .confidence-bar {
+        height: 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+        margin-top: 0.5rem;
+    }
+    
+    .confidence-fill {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+    
+    .action-buttons .btn {
+        min-width: 120px;
+        margin: 0.25rem;
+    }
+    
+    .review-stats {
+        position: sticky;
+        top: 100px;
+        z-index: 10;
+    }
+    
+    .progress-circle {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: conic-gradient(
+            var(--primary-gradient) var(--progress-percent, 0%),
+            rgba(255, 255, 255, 0.1) var(--progress-percent, 0%)
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    
+    .progress-circle::before {
+        content: '';
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: var(--dark-bg);
+        position: absolute;
+    }
+    
+    .progress-text {
+        position: relative;
+        z-index: 1;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+    
+    .filter-section {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 20px;
+        border: 2px dashed rgba(255, 255, 255, 0.2);
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        color: rgba(255, 255, 255, 0.3);
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 页面标题 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="glass-card glass-card-sm">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="mb-1">
+                            <i class="bi bi-eye me-2"></i>人工复核
+                        </h2>
+                        <p class="text-muted mb-0">对需要复核的数据进行人工标注和确认</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success-modern" onclick="batchApprove()">
+                            <i class="bi bi-check-all me-1"></i>批量通过
+                        </button>
+                        <button class="btn btn-modern" onclick="exportReviewData()">
+                            <i class="bi bi-download me-1"></i>导出复核数据
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 侧边栏统计 -->
+        <div class="col-lg-3">
+            <div class="review-stats">
+                <!-- 复核进度 -->
+                <div class="glass-card glass-card-sm text-center mb-3">
+                    <h6 class="text-muted mb-3">复核进度</h6>
+                    <div class="progress-circle mx-auto mb-3" id="reviewProgress">
+                        <div class="progress-text" id="progressText">0%</div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="stat-number small" id="reviewedCount">0</div>
+                            <div class="stat-label small">已复核</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-number small" id="totalCount">0</div>
+                            <div class="stat-label small">总数</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 快速统计 -->
+                <div class="glass-card glass-card-sm mb-3">
+                    <h6 class="text-muted mb-3">统计信息</h6>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>需要复核</span>
+                        <span class="badge bg-warning" id="needsReviewCount">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>预测正确</span>
+                        <span class="badge bg-success" id="correctCount">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>预测错误</span>
+                        <span class="badge bg-danger" id="incorrectCount">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>准确率</span>
+                        <span class="badge bg-info" id="accuracyRate">-</span>
+                    </div>
+                </div>
+
+                <!-- 过滤选项 -->
+                <div class="glass-card glass-card-sm">
+                    <h6 class="text-muted mb-3">过滤选项</h6>
+                    <div class="mb-3">
+                        <label class="form-label small">复核状态</label>
+                        <select class="form-select form-select-modern form-select-sm" id="reviewStatusFilter">
+                            <option value="all">全部</option>
+                            <option value="needs_review" selected>需要复核</option>
+                            <option value="reviewed">已复核</option>
+                            <option value="approved">已通过</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">预测结果</label>
+                        <select class="form-select form-select-modern form-select-sm" id="predictionFilter">
+                            <option value="all">全部</option>
+                            <option value="positive">正面</option>
+                            <option value="negative">负面</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">数据来源</label>
+                        <select class="form-select form-select-modern form-select-sm" id="sourceFilter">
+                            <option value="all">全部来源</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-modern btn-sm w-100" onclick="applyFilters()">
+                        <i class="bi bi-funnel me-1"></i>应用过滤
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要内容区域 -->
+        <div class="col-lg-9">
+            <!-- 数据列表 -->
+            <div id="reviewList">
+                <!-- 数据将通过JavaScript动态加载 -->
+            </div>
+
+            <!-- 空状态 -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="bi bi-clipboard-check"></i>
+                <h4>没有需要复核的数据</h4>
+                <p class="text-muted">所有数据都已完成复核，或者当前过滤条件下没有匹配的数据。</p>
+                <button class="btn btn-modern" onclick="clearFilters()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>重置过滤条件
+                </button>
+            </div>
+
+            <!-- 分页 -->
+            <div class="d-flex justify-content-center mt-4">
+                <nav>
+                    <ul class="pagination" id="pagination">
+                        <!-- 分页将动态生成 -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 复核详情模态框 -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">
+                    <i class="bi bi-eye me-2"></i>数据复核
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <label class="form-label">文本内容</label>
+                    <div class="text-content" id="modalTextContent"></div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label">LLM预测</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="prediction-badge" id="modalLlmPrediction"></span>
+                            <small class="text-muted" id="modalLlmConfidence"></small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">SnowNLP预测</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="prediction-badge" id="modalSnowPrediction"></span>
+                            <small class="text-muted" id="modalSnowConfidence"></small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">人工标注</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="finalLabel" id="labelPositive" value="1">
+                        <label class="btn btn-outline-success" for="labelPositive">
+                            <i class="bi bi-emoji-smile me-1"></i>正面
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="finalLabel" id="labelNegative" value="0">
+                        <label class="btn btn-outline-danger" for="labelNegative">
+                            <i class="bi bi-emoji-frown me-1"></i>负面
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">备注 <span class="text-muted">(可选)</span></label>
+                    <textarea class="form-control form-control-modern" id="reviewNotes" rows="3" placeholder="添加复核备注..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-success-modern" onclick="saveReview()">
+                    <i class="bi bi-check-lg me-1"></i>保存复核结果
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let reviewData = [];
+let filteredData = [];
+let currentPage = 1;
+let pageSize = 10;
+let currentReviewIndex = -1;
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadReviewData();
+    loadSourceOptions();
+});
+
+// 加载复核数据
+async function loadReviewData() {
+    try {
+        showLoading('加载复核数据...', '正在获取需要复核的数据');
+        
+        const response = await fetch('/api/data');
+        const data = await response.json();
+        
+        if (Array.isArray(data)) {
+            reviewData = data;
+            applyFilters();
+            updateStatistics();
+        } else {
+            reviewData = [];
+            showToast('获取数据失败', 'error');
+        }
+    } catch (error) {
+        console.error('加载复核数据失败:', error);
+        showToast('加载数据失败: ' + error.message, 'error');
+        reviewData = [];
+    } finally {
+        hideLoading();
+    }
+}
+
+// 加载数据来源选项
+async function loadSourceOptions() {
+    try {
+        const response = await fetch('/api/stats');
+        const stats = await response.json();
+        
+        const sourceSelect = document.getElementById('sourceFilter');
+        sourceSelect.innerHTML = '<option value="all">全部来源</option>';
+        
+        if (stats.source_stats) {
+            Object.keys(stats.source_stats).forEach(source => {
+                const option = document.createElement('option');
+                option.value = source;
+                option.textContent = `${source} (${stats.source_stats[source]})`;
+                sourceSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载数据源失败:', error);
+    }
+}
+
+// 应用过滤条件
+function applyFilters() {
+    const statusFilter = document.getElementById('reviewStatusFilter').value;
+    const predictionFilter = document.getElementById('predictionFilter').value;
+    const sourceFilter = document.getElementById('sourceFilter').value;
+    
+    filteredData = reviewData.filter(item => {
+        // 状态过滤
+        if (statusFilter === 'needs_review' && !item.needs_review) return false;
+        if (statusFilter === 'reviewed' && !item.reviewed) return false;
+        if (statusFilter === 'approved' && item.needs_review) return false;
+        
+        // 预测结果过滤
+        if (predictionFilter === 'positive' && item.llm_prediction !== 1) return false;
+        if (predictionFilter === 'negative' && item.llm_prediction !== 0) return false;
+        
+        // 数据来源过滤
+        if (sourceFilter !== 'all' && item.source !== sourceFilter) return false;
+        
+        return true;
+    });
+    
+    currentPage = 1;
+    renderReviewList();
+    renderPagination();
+}
+
+// 清除过滤条件
+function clearFilters() {
+    document.getElementById('reviewStatusFilter').value = 'all';
+    document.getElementById('predictionFilter').value = 'all';
+    document.getElementById('sourceFilter').value = 'all';
+    applyFilters();
+}
+
+// 渲染复核列表
+function renderReviewList() {
+    const container = document.getElementById('reviewList');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (filteredData.length === 0) {
+        container.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+    }
+    
+    emptyState.style.display = 'none';
+    
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, filteredData.length);
+    const pageData = filteredData.slice(startIndex, endIndex);
+    
+    const html = pageData.map((item, index) => {
+        const globalIndex = startIndex + index;
+        return createReviewCard(item, globalIndex);
+    }).join('');
+    
+    container.innerHTML = html;
+}
+
+// 创建复核卡片
+function createReviewCard(item, index) {
+    const llmPredictionText = item.llm_prediction === 1 ? '正面' : '负面';
+    const llmPredictionClass = item.llm_prediction === 1 ? 'prediction-positive' : 'prediction-negative';
+    
+    const snowPredictionText = item.snownlp_prediction === 1 ? '正面' : '负面';
+    const snowPredictionClass = item.snownlp_prediction === 1 ? 'prediction-positive' : 'prediction-negative';
+    
+    const finalLabel = item.final_label !== undefined ? 
+        (item.final_label === 1 ? '正面' : '负面') : '未标注';
+    
+    const isReviewed = item.reviewed;
+    const needsReview = item.needs_review;
+    
+    return `
+        <div class="glass-card review-card mb-3" data-index="${index}">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="text-content">
+                        ${item.text || '无文本内容'}
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <small class="text-muted d-block mb-1">LLM预测</small>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="prediction-badge ${llmPredictionClass}">${llmPredictionText}</span>
+                                <small class="text-muted">${(item.llm_confidence * 100).toFixed(1)}%</small>
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill ${llmPredictionClass}" style="width: ${item.llm_confidence * 100}%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <small class="text-muted d-block mb-1">SnowNLP预测</small>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="prediction-badge ${snowPredictionClass}">${snowPredictionText}</span>
+                                <small class="text-muted">${(item.snownlp_confidence * 100).toFixed(1)}%</small>
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill ${snowPredictionClass}" style="width: ${item.snownlp_confidence * 100}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="d-flex flex-column h-100 justify-content-between">
+                        <div>
+                            <div class="mb-2">
+                                <small class="text-muted">当前状态</small>
+                                <div>
+                                    ${needsReview ? '<span class="badge bg-warning">需要复核</span>' : ''}
+                                    ${isReviewed ? '<span class="badge bg-success">已复核</span>' : ''}
+                                    ${!needsReview && !isReviewed ? '<span class="badge bg-info">无需复核</span>' : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="mb-2">
+                                <small class="text-muted">人工标注</small>
+                                <div class="fw-bold">${finalLabel}</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <small class="text-muted">数据来源</small>
+                                <div>${item.source || '未知'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button class="btn btn-modern btn-sm w-100 mb-2" onclick="openReviewModal(${index})">
+                                <i class="bi bi-eye me-1"></i>详细复核
+                            </button>
+                            
+                            ${needsReview ? `
+                                <div class="row g-1">
+                                    <div class="col-6">
+                                        <button class="btn btn-success btn-sm w-100" onclick="quickApprove(${index}, 1)">
+                                            <i class="bi bi-hand-thumbs-up"></i>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button class="btn btn-danger btn-sm w-100" onclick="quickApprove(${index}, 0)">
+                                            <i class="bi bi-hand-thumbs-down"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// 打开复核模态框
+function openReviewModal(index) {
+    const item = filteredData[index];
+    currentReviewIndex = index;
+    
+    document.getElementById('modalTextContent').textContent = item.text || '';
+    
+    // LLM预测
+    const llmPredText = item.llm_prediction === 1 ? '正面' : '负面';
+    const llmPredClass = item.llm_prediction === 1 ? 'prediction-positive' : 'prediction-negative';
+    document.getElementById('modalLlmPrediction').textContent = llmPredText;
+    document.getElementById('modalLlmPrediction').className = `prediction-badge ${llmPredClass}`;
+    document.getElementById('modalLlmConfidence').textContent = `置信度: ${(item.llm_confidence * 100).toFixed(1)}%`;
+    
+    // SnowNLP预测
+    const snowPredText = item.snownlp_prediction === 1 ? '正面' : '负面';
+    const snowPredClass = item.snownlp_prediction === 1 ? 'prediction-positive' : 'prediction-negative';
+    document.getElementById('modalSnowPrediction').textContent = snowPredText;
+    document.getElementById('modalSnowPrediction').className = `prediction-badge ${snowPredClass}`;
+    document.getElementById('modalSnowConfidence').textContent = `置信度: ${(item.snownlp_confidence * 100).toFixed(1)}%`;
+    
+    // 设置当前标注
+    if (item.final_label !== undefined) {
+        if (item.final_label === 1) {
+            document.getElementById('labelPositive').checked = true;
+        } else {
+            document.getElementById('labelNegative').checked = true;
+        }
+    } else {
+        // 默认选择LLM预测结果
+        if (item.llm_prediction === 1) {
+            document.getElementById('labelPositive').checked = true;
+        } else {
+            document.getElementById('labelNegative').checked = true;
+        }
+    }
+    
+    // 设置备注
+    document.getElementById('reviewNotes').value = item.review_notes || '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('reviewModal'));
+    modal.show();
+}
+
+// 保存复核结果
+async function saveReview() {
+    if (currentReviewIndex === -1) return;
+    
+    const finalLabel = document.querySelector('input[name="finalLabel"]:checked')?.value;
+    const reviewNotes = document.getElementById('reviewNotes').value;
+    
+    if (finalLabel === undefined) {
+        showToast('请选择情感标注', 'warning');
+        return;
+    }
+    
+    try {
+        showLoading('保存复核结果...', '正在更新数据');
+        
+        const item = filteredData[currentReviewIndex];
+        const originalIndex = reviewData.findIndex(d => d === item);
+        
+        // 更新数据
+        reviewData[originalIndex] = {
+            ...item,
+            final_label: parseInt(finalLabel),
+            reviewed: true,
+            needs_review: false,
+            review_notes: reviewNotes,
+            review_time: new Date().toISOString(),
+            reviewer: 'current_user'
+        };
+        
+        // 发送到服务器
+        const response = await fetch(`/api/data/${originalIndex}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                final_label: parseInt(finalLabel),
+                reviewed: true,
+                needs_review: false,
+                review_notes: reviewNotes,
+                review_time: new Date().toISOString(),
+                reviewer: 'current_user'
+            })
+        });
+        
+        if (response.ok) {
+            showToast('复核结果已保存', 'success');
+            
+            // 关闭模态框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('reviewModal'));
+            modal.hide();
+            
+            // 重新渲染
+            applyFilters();
+            updateStatistics();
+        } else {
+            throw new Error('保存失败');
+        }
+    } catch (error) {
+        console.error('保存复核结果失败:', error);
+        showToast('保存失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// 快速审批
+async function quickApprove(index, label) {
+    try {
+        const item = filteredData[index];
+        const originalIndex = reviewData.findIndex(d => d === item);
+        
+        // 更新数据
+        reviewData[originalIndex] = {
+            ...item,
+            final_label: label,
+            reviewed: true,
+            needs_review: false,
+            review_time: new Date().toISOString(),
+            reviewer: 'current_user'
+        };
+        
+        // 发送到服务器
+        const response = await fetch(`/api/data/${originalIndex}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                final_label: label,
+                reviewed: true,
+                needs_review: false,
+                review_time: new Date().toISOString(),
+                reviewer: 'current_user'
+            })
+        });
+        
+        if (response.ok) {
+            showToast(label === 1 ? '标记为正面' : '标记为负面', 'success');
+            applyFilters();
+            updateStatistics();
+        } else {
+            throw new Error('保存失败');
+        }
+    } catch (error) {
+        console.error('快速审批失败:', error);
+        showToast('操作失败: ' + error.message, 'error');
+    }
+}
+
+// 批量通过
+function batchApprove() {
+    const needsReviewItems = filteredData.filter(item => item.needs_review);
+    
+    if (needsReviewItems.length === 0) {
+        showToast('没有需要批量通过的数据', 'warning');
+        return;
+    }
+    
+    if (confirm(`确定要批量通过 ${needsReviewItems.length} 条数据吗？将使用LLM预测结果作为最终标注。`)) {
+        batchApproveItems(needsReviewItems);
+    }
+}
+
+// 执行批量通过
+async function batchApproveItems(items) {
+    try {
+        showLoading('批量处理中...', `正在处理 ${items.length} 条数据`);
+        
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const originalIndex = reviewData.findIndex(d => d === item);
+            
+            reviewData[originalIndex] = {
+                ...item,
+                final_label: item.llm_prediction,
+                reviewed: true,
+                needs_review: false,
+                review_time: new Date().toISOString(),
+                reviewer: 'batch_approve'
+            };
+            
+            await fetch(`/api/data/${originalIndex}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    final_label: item.llm_prediction,
+                    reviewed: true,
+                    needs_review: false,
+                    review_time: new Date().toISOString(),
+                    reviewer: 'batch_approve'
+                })
+            });
+        }
+        
+        showToast(`成功批量通过 ${items.length} 条数据`, 'success');
+        applyFilters();
+        updateStatistics();
+        
+    } catch (error) {
+        console.error('批量通过失败:', error);
+        showToast('批量处理失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// 导出复核数据
+function exportReviewData() {
+    const exportData = filteredData.map(item => ({
+        text: item.text,
+        llm_prediction: item.llm_prediction === 1 ? '正面' : '负面',
+        llm_confidence: item.llm_confidence,
+        snownlp_prediction: item.snownlp_prediction === 1 ? '正面' : '负面',
+        snownlp_confidence: item.snownlp_confidence,
+        final_label: item.final_label !== undefined ? (item.final_label === 1 ? '正面' : '负面') : '未标注',
+        reviewed: item.reviewed ? '是' : '否',
+        needs_review: item.needs_review ? '是' : '否',
+        review_notes: item.review_notes || '',
+        review_time: item.review_time || '',
+        reviewer: item.reviewer || ''
+    }));
+    
+    // 触发下载
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `review_data_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showToast('复核数据已导出', 'success');
+}
+
+// 更新统计信息
+function updateStatistics() {
+    const totalCount = reviewData.length;
+    const reviewedCount = reviewData.filter(item => item.reviewed).length;
+    const needsReviewCount = reviewData.filter(item => item.needs_review).length;
+    
+    // 计算准确率
+    const labeledData = reviewData.filter(item => item.final_label !== undefined);
+    const correctPredictions = labeledData.filter(item => item.llm_prediction === item.final_label).length;
+    const accuracyRate = labeledData.length > 0 ? (correctPredictions / labeledData.length * 100).toFixed(1) + '%' : '-';
+    
+    // 更新进度圆环
+    const progressPercent = totalCount > 0 ? Math.round(reviewedCount / totalCount * 100) : 0;
+    const progressCircle = document.getElementById('reviewProgress');
+    progressCircle.style.setProperty('--progress-percent', progressPercent + '%');
+    document.getElementById('progressText').textContent = progressPercent + '%';
+    
+    // 更新统计数字
+    document.getElementById('reviewedCount').textContent = reviewedCount;
+    document.getElementById('totalCount').textContent = totalCount;
+    document.getElementById('needsReviewCount').textContent = needsReviewCount;
+    document.getElementById('correctCount').textContent = correctPredictions;
+    document.getElementById('incorrectCount').textContent = labeledData.length - correctPredictions;
+    document.getElementById('accuracyRate').textContent = accuracyRate;
+}
+
+// 渲染分页
+function renderPagination() {
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    const pagination = document.getElementById('pagination');
+    
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // 上一页
+    html += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">上一页</a>
+        </li>
+    `;
+    
+    // 页码
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+            html += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                </li>
+            `;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+            html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+    }
+    
+    // 下一页
+    html += `
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">下一页</a>
+        </li>
+    `;
+    
+    pagination.innerHTML = html;
+}
+
+// 切换页面
+function changePage(page) {
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    if (page < 1 || page > totalPages) return;
+    
+    currentPage = page;
+    renderReviewList();
+    renderPagination();
+    
+    // 滚动到顶部
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+</script>
+{% endblock %} 

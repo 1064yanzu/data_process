@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}主页 - 情感分析系统{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="glass-card text-center mb-5">
+    <div class="row align-items-center">
+        <div class="col-lg-6">
+            <h1 class="display-4 fw-bold mb-4">
+                <i class="bi bi-brain text-gradient me-3"></i>
+                智能情感分析系统
+            </h1>
+            <p class="lead mb-4">基于LLM和机器学习的企业级中文情感分析解决方案</p>
+            <div class="d-flex gap-3 justify-content-center">
+                <a href="/upload" class="btn btn-modern btn-lg">
+                    <i class="bi bi-rocket-takeoff me-2"></i>开始使用
+                </a>
+                <a href="#workflow" class="btn btn-outline-light btn-lg">
+                    <i class="bi bi-info-circle me-2"></i>了解更多
+                </a>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="text-center">
+                <div class="float">
+                    <i class="bi bi-graph-up-arrow" style="font-size: 8rem; opacity: 0.6;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row g-4 mb-5" id="statsContainer">
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-number" id="totalData">0</div>
+            <div class="stat-label">
+                <i class="bi bi-database me-2"></i>总数据量
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-number" id="processedData">0</div>
+            <div class="stat-label">
+                <i class="bi bi-cpu me-2"></i>已处理数据
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-number" id="needsReview">0</div>
+            <div class="stat-label">
+                <i class="bi bi-eye me-2"></i>待复核数据
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-number" id="accuracy">0%</div>
+            <div class="stat-label">
+                <i class="bi bi-bullseye me-2"></i>系统准确率
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Workflow Overview -->
+<div class="glass-card mb-5" id="workflow">
+    <h2 class="text-center mb-5">
+        <i class="bi bi-diagram-3 me-3"></i>工作流程
+    </h2>
+    
+    <div class="row g-4">
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="text-center">
+                <div class="workflow-step mb-3">
+                    <div class="workflow-icon">
+                        <i class="bi bi-cloud-upload"></i>
+                    </div>
+                    <div class="workflow-number">1</div>
+                </div>
+                <h5>数据上传</h5>
+                <p class="text-muted">支持CSV、TXT等格式文件批量上传</p>
+            </div>
+        </div>
+        
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="text-center">
+                <div class="workflow-step mb-3">
+                    <div class="workflow-icon">
+                        <i class="bi bi-gear"></i>
+                    </div>
+                    <div class="workflow-number">2</div>
+                </div>
+                <h5>LLM配置</h5>
+                <p class="text-muted">配置API密钥、模型参数、并发数量</p>
+            </div>
+        </div>
+        
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="text-center">
+                <div class="workflow-step mb-3">
+                    <div class="workflow-icon">
+                        <i class="bi bi-cpu"></i>
+                    </div>
+                    <div class="workflow-number">3</div>
+                </div>
+                <h5>批量处理</h5>
+                <p class="text-muted">智能情感分析，支持并发处理</p>
+            </div>
+        </div>
+        
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="text-center">
+                <div class="workflow-step mb-3">
+                    <div class="workflow-icon">
+                        <i class="bi bi-eye"></i>
+                    </div>
+                    <div class="workflow-number">4</div>
+                </div>
+                <h5>人工复核</h5>
+                <p class="text-muted">设置复核比例，确保数据质量</p>
+            </div>
+        </div>
+        
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="text-center">
+                <div class="workflow-step mb-3">
+                    <div class="workflow-icon">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div class="workflow-number">5</div>
+                </div>
+                <h5>模型训练</h5>
+                <p class="text-muted">基于标注数据训练专用模型</p>
+            </div>
+        </div>
+        
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="text-center">
+                <div class="workflow-step mb-3">
+                    <div class="workflow-icon">
+                        <i class="bi bi-graph-up"></i>
+                    </div>
+                    <div class="workflow-number">6</div>
+                </div>
+                <h5>效果评估</h5>
+                <p class="text-muted">多维度性能分析和对比</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-4">
+        <div class="glass-card glass-card-sm h-100">
+            <div class="text-center">
+                <div class="action-icon mb-3">
+                    <i class="bi bi-cloud-upload"></i>
+                </div>
+                <h4>数据上传</h4>
+                <p class="text-muted mb-4">上传CSV或TXT文件，开始情感分析流程</p>
+                <a href="/upload" class="btn btn-modern w-100">
+                    <i class="bi bi-upload me-2"></i>开始上传
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="glass-card glass-card-sm h-100">
+            <div class="text-center">
+                <div class="action-icon mb-3">
+                    <i class="bi bi-gear"></i>
+                </div>
+                <h4>LLM配置</h4>
+                <p class="text-muted mb-4">配置大语言模型API和参数设置</p>
+                <a href="/config" class="btn btn-success-modern w-100">
+                    <i class="bi bi-gear me-2"></i>配置API
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="glass-card glass-card-sm h-100">
+            <div class="text-center">
+                <div class="action-icon mb-3">
+                    <i class="bi bi-eye"></i>
+                </div>
+                <h4>数据复核</h4>
+                <p class="text-muted mb-4">查看和修正LLM预测的情感标签</p>
+                <a href="/review" class="btn btn-danger-modern w-100">
+                    <i class="bi bi-eye me-2"></i>开始复核
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status -->
+<div class="glass-card">
+    <h3 class="mb-4">
+        <i class="bi bi-activity me-3"></i>系统状态
+    </h3>
+    
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="status-item">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>数据处理进度</span>
+                    <span id="dataProgress">0%</span>
+                </div>
+                <div class="progress-modern">
+                    <div class="progress-bar-modern" id="dataProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="status-item">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>模型训练状态</span>
+                    <span class="badge bg-secondary" id="modelStatus">未训练</span>
+                </div>
+                <div class="text-muted">
+                    <small id="modelInfo">暂无可用模型</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mt-3">
+            <div class="status-item">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>LLM连接状态</span>
+                    <span class="badge bg-warning" id="llmStatus">未测试</span>
+                </div>
+                <div class="text-muted">
+                    <small id="llmInfo">请先配置LLM API</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mt-3">
+            <div class="status-item">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>最近活动</span>
+                    <span class="text-muted" id="lastActivity">暂无活动</span>
+                </div>
+                <div class="text-muted">
+                    <small id="activityInfo">系统空闲中</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.text-gradient {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.workflow-step {
+    position: relative;
+    display: inline-block;
+}
+
+.workflow-icon {
+    width: 80px;
+    height: 80px;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border: 2px solid var(--glass-border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+}
+
+.workflow-icon i {
+    font-size: 2rem;
+    color: var(--text-primary);
+}
+
+.workflow-number {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 30px;
+    height: 30px;
+    background: var(--primary-gradient);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.workflow-step:hover .workflow-icon {
+    transform: scale(1.1);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+}
+
+.action-icon {
+    width: 100px;
+    height: 100px;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border: 2px solid var(--glass-border);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+}
+
+.action-icon i {
+    font-size: 3rem;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.glass-card:hover .action-icon {
+    transform: scale(1.05);
+}
+
+.status-item {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+}
+
+@media (max-width: 768px) {
+    .workflow-icon {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .workflow-icon i {
+        font-size: 1.5rem;
+    }
+    
+    .action-icon {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .action-icon i {
+        font-size: 2.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let statsUpdateInterval;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+    
+    // Update stats every 10 seconds
+    statsUpdateInterval = setInterval(loadDashboardData, 10000);
+});
+
+async function loadDashboardData() {
+    try {
+        const response = await fetch('/api/stats');
+        const stats = await response.json();
+        
+        updateStats(stats);
+        updateProgressBars(stats);
+        updateSystemStatus();
+        
+    } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+    }
+}
+
+function updateStats(stats) {
+    // Animate number updates
+    animateNumber('totalData', stats.total || 0);
+    animateNumber('processedData', stats.labeled || 0);
+    animateNumber('needsReview', stats.needs_review || 0);
+    
+    // Calculate accuracy
+    const accuracy = stats.labeled > 0 ? 
+        Math.round((stats.reviewed / stats.labeled) * 100) : 0;
+    animateNumber('accuracy', accuracy, '%');
+}
+
+function animateNumber(elementId, targetValue, suffix = '') {
+    const element = document.getElementById(elementId);
+    const currentValue = parseInt(element.textContent) || 0;
+    const increment = Math.ceil((targetValue - currentValue) / 20);
+    
+    if (currentValue !== targetValue) {
+        let current = currentValue;
+        const timer = setInterval(() => {
+            current += increment;
+            if ((increment > 0 && current >= targetValue) || 
+                (increment < 0 && current <= targetValue)) {
+                current = targetValue;
+                clearInterval(timer);
+            }
+            element.textContent = current + suffix;
+        }, 50);
+    }
+}
+
+function updateProgressBars(stats) {
+    const totalProgress = stats.total > 0 ? 
+        Math.round((stats.labeled / stats.total) * 100) : 0;
+    
+    document.getElementById('dataProgress').textContent = totalProgress + '%';
+    document.getElementById('dataProgressBar').style.width = totalProgress + '%';
+}
+
+async function updateSystemStatus() {
+    // Check LLM configuration
+    try {
+        const configResponse = await fetch('/api/llm-config');
+        const config = await configResponse.json();
+        
+        if (config.api_key) {
+            document.getElementById('llmStatus').textContent = '已配置';
+            document.getElementById('llmStatus').className = 'badge bg-success';
+            document.getElementById('llmInfo').textContent = `模型: ${config.model_name}`;
+        } else {
+            document.getElementById('llmStatus').textContent = '未配置';
+            document.getElementById('llmStatus').className = 'badge bg-warning';
+            document.getElementById('llmInfo').textContent = '请先配置LLM API';
+        }
+    } catch (error) {
+        console.error('Failed to check LLM config:', error);
+    }
+    
+    // Update last activity
+    document.getElementById('lastActivity').textContent = new Date().toLocaleTimeString();
+    document.getElementById('activityInfo').textContent = '数据已更新';
+}
+
+// Add floating animation to cards on scroll
+const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -50px 0px'
+};
+
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.style.opacity = '1';
+            entry.target.style.transform = 'translateY(0)';
+        }
+    });
+}, observerOptions);
+
+// Observe all glass cards
+document.querySelectorAll('.glass-card, .stat-card').forEach(card => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(20px)';
+    card.style.transition = 'all 0.6s ease';
+    observer.observe(card);
+});
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+    if (statsUpdateInterval) {
+        clearInterval(statsUpdateInterval);
+    }
+});
+</script>
+{% endblock %} 

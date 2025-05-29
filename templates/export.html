@@ -1,0 +1,700 @@
+{% extends "base.html" %}
+
+{% block title %}数据导出 - 情感分析系统{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="glass-card text-center mb-5">
+    <h1 class="display-5 fw-bold mb-3">
+        <i class="bi bi-download text-gradient me-3"></i>数据导出
+    </h1>
+    <p class="lead">导出标注数据，支持多种格式和筛选条件</p>
+</div>
+
+<div class="row g-4">
+    <!-- Export Configuration -->
+    <div class="col-lg-8">
+        <div class="glass-card">
+            <!-- Data Statistics -->
+            <div class="mb-4">
+                <h4 class="mb-3">
+                    <i class="bi bi-graph-up me-2"></i>数据统计
+                </h4>
+                
+                <div class="row g-3" id="dataStats">
+                    <div class="col-md-3">
+                        <div class="stat-card-sm">
+                            <div class="stat-number" id="totalCount">0</div>
+                            <div class="stat-label">总数据量</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card-sm">
+                            <div class="stat-number text-success" id="labeledCount">0</div>
+                            <div class="stat-label">已标注</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card-sm">
+                            <div class="stat-number text-warning" id="needsReviewCount">0</div>
+                            <div class="stat-label">需复核</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card-sm">
+                            <div class="stat-number text-info" id="reviewedCount">0</div>
+                            <div class="stat-label">已复核</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Options -->
+            <div class="mb-4">
+                <h4 class="mb-3">
+                    <i class="bi bi-funnel me-2"></i>导出配置
+                </h4>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="exportType" class="form-label">数据类型</label>
+                        <select id="exportType" class="form-select-modern">
+                            <option value="all">全部数据</option>
+                            <option value="labeled">已标注数据</option>
+                            <option value="unlabeled">未标注数据</option>
+                            <option value="needs_review">需复核数据</option>
+                            <option value="reviewed">已复核数据</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="exportFormat" class="form-label">导出格式</label>
+                        <select id="exportFormat" class="form-select-modern">
+                            <option value="csv">CSV 文件</option>
+                            <option value="excel">Excel 文件</option>
+                            <option value="json">JSON 文件</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="datasetFilter" class="form-label">数据集过滤</label>
+                        <select id="datasetFilter" class="form-select-modern">
+                            <option value="all">全部数据集</option>
+                            <option value="train">仅训练集</option>
+                            <option value="test">仅测试集</option>
+                            <option value="validation">仅验证集</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="sentimentFilter" class="form-label">情感过滤</label>
+                        <select id="sentimentFilter" class="form-select-modern">
+                            <option value="all">全部情感</option>
+                            <option value="positive">仅正面</option>
+                            <option value="negative">仅负面</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Field Selection -->
+            <div class="mb-4">
+                <h4 class="mb-3">
+                    <i class="bi bi-list-check me-2"></i>导出字段选择
+                </h4>
+                
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="field_text" checked>
+                            <label class="form-check-label" for="field_text">文本内容</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="field_llm_prediction" checked>
+                            <label class="form-check-label" for="field_llm_prediction">LLM预测</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="field_llm_confidence" checked>
+                            <label class="form-check-label" for="field_llm_confidence">LLM置信度</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="field_snownlp_prediction">
+                            <label class="form-check-label" for="field_snownlp_prediction">SnowNLP预测</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="field_final_label" checked>
+                            <label class="form-check-label" for="field_final_label">人工标注</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="field_needs_review">
+                            <label class="form-check-label" for="field_needs_review">需要复核</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="field_dataset_type">
+                            <label class="form-check-label" for="field_dataset_type">数据集类型</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="field_timestamp">
+                            <label class="form-check-label" for="field_timestamp">处理时间</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <button class="btn btn-outline-light btn-sm me-2" onclick="selectAllFields()">
+                        <i class="bi bi-check-all me-1"></i>全选
+                    </button>
+                    <button class="btn btn-outline-light btn-sm me-2" onclick="selectNoneFields()">
+                        <i class="bi bi-x-lg me-1"></i>全不选
+                    </button>
+                    <button class="btn btn-outline-light btn-sm" onclick="selectEssentialFields()">
+                        <i class="bi bi-star me-1"></i>仅必要字段
+                    </button>
+                </div>
+            </div>
+
+            <!-- Preview -->
+            <div class="mb-4">
+                <h4 class="mb-3">
+                    <i class="bi bi-eye me-2"></i>导出预览
+                </h4>
+                
+                <div class="preview-container">
+                    <div id="exportPreview" class="export-preview">
+                        <div class="text-center text-muted">
+                            <i class="bi bi-file-earmark-text" style="font-size: 2rem; opacity: 0.5;"></i>
+                            <p class="mt-2 mb-0">点击"生成预览"查看导出内容</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <button class="btn btn-outline-light" onclick="generatePreview()">
+                        <i class="bi bi-eye me-2"></i>生成预览
+                    </button>
+                </div>
+            </div>
+
+            <!-- Export Actions -->
+            <div class="d-flex gap-3 justify-content-center">
+                <button class="btn btn-modern btn-lg" onclick="exportData()">
+                    <i class="bi bi-download me-2"></i>导出数据
+                </button>
+                <button class="btn btn-outline-light btn-lg" onclick="resetConfig()">
+                    <i class="bi bi-arrow-clockwise me-2"></i>重置配置
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Export Info Panel -->
+    <div class="col-lg-4">
+        <!-- Current Selection -->
+        <div class="glass-card glass-card-sm mb-4">
+            <h5 class="mb-3">
+                <i class="bi bi-info-circle me-2"></i>当前选择
+            </h5>
+            
+            <div id="selectionInfo">
+                <div class="info-item mb-2">
+                    <span class="info-label">数据类型：</span>
+                    <span id="selectedType">全部数据</span>
+                </div>
+                <div class="info-item mb-2">
+                    <span class="info-label">导出格式：</span>
+                    <span id="selectedFormat">CSV</span>
+                </div>
+                <div class="info-item mb-2">
+                    <span class="info-label">预计数量：</span>
+                    <span id="estimatedCount">0</span> 条
+                </div>
+                <div class="info-item mb-2">
+                    <span class="info-label">包含字段：</span>
+                    <span id="fieldCount">0</span> 个
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Export -->
+        <div class="glass-card glass-card-sm mb-4">
+            <h5 class="mb-3">
+                <i class="bi bi-lightning me-2"></i>快速导出
+            </h5>
+            
+            <div class="d-grid gap-2">
+                <button class="btn btn-success-modern btn-sm" onclick="quickExport('labeled', 'csv')">
+                    <i class="bi bi-check-circle me-2"></i>已标注数据 (CSV)
+                </button>
+                <button class="btn btn-warning-modern btn-sm" onclick="quickExport('needs_review', 'excel')">
+                    <i class="bi bi-exclamation-triangle me-2"></i>需复核数据 (Excel)
+                </button>
+                <button class="btn btn-info-modern btn-sm" onclick="quickExport('all', 'json')">
+                    <i class="bi bi-file-earmark-code me-2"></i>全部数据 (JSON)
+                </button>
+            </div>
+        </div>
+        
+        <!-- Export History -->
+        <div class="glass-card glass-card-sm">
+            <h5 class="mb-3">
+                <i class="bi bi-clock-history me-2"></i>导出历史
+            </h5>
+            
+            <div id="exportHistory">
+                <div class="text-center text-muted">
+                    <i class="bi bi-folder-x" style="font-size: 2rem; opacity: 0.5;"></i>
+                    <p class="mt-2 mb-0">暂无导出记录</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-card-sm {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    transition: all 0.3s ease;
+}
+
+.stat-card-sm:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.preview-container {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 15px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+}
+
+.export-preview {
+    max-height: 300px;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.preview-table {
+    width: 100%;
+    font-size: 0.875rem;
+}
+
+.preview-table th,
+.preview-table td {
+    padding: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: left;
+}
+
+.preview-table th {
+    background: rgba(255, 255, 255, 0.1);
+    font-weight: 600;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.btn-warning-modern {
+    background: linear-gradient(135deg, #ffc107 0%, #ff8c00 100%);
+    border: none;
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+    color: white;
+}
+
+.btn-warning-modern:hover {
+    box-shadow: 0 8px 25px rgba(255, 193, 7, 0.6);
+    color: white;
+}
+
+.btn-info-modern {
+    background: linear-gradient(135deg, #17a2b8 0%, #007bff 100%);
+    border: none;
+    box-shadow: 0 4px 15px rgba(23, 162, 184, 0.4);
+    color: white;
+}
+
+.btn-info-modern:hover {
+    box-shadow: 0 8px 25px rgba(23, 162, 184, 0.6);
+    color: white;
+}
+
+.form-check {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    backdrop-filter: blur(5px);
+}
+
+.form-check-input:checked {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+@media (max-width: 768px) {
+    .stat-card-sm {
+        padding: 1rem;
+    }
+    
+    .preview-container {
+        padding: 0.75rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentStats = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadExportStats();
+    setupEventListeners();
+    loadExportHistory();
+});
+
+function setupEventListeners() {
+    // Update selection info when options change
+    document.getElementById('exportType').addEventListener('change', updateSelectionInfo);
+    document.getElementById('exportFormat').addEventListener('change', updateSelectionInfo);
+    document.getElementById('datasetFilter').addEventListener('change', updateSelectionInfo);
+    document.getElementById('sentimentFilter').addEventListener('change', updateSelectionInfo);
+    
+    // Update field count when checkboxes change
+    document.querySelectorAll('input[type="checkbox"][id^="field_"]').forEach(checkbox => {
+        checkbox.addEventListener('change', updateFieldCount);
+    });
+}
+
+async function loadExportStats() {
+    try {
+        const response = await fetch('/api/export-stats');
+        currentStats = await response.json();
+        
+        document.getElementById('totalCount').textContent = currentStats.total || 0;
+        document.getElementById('labeledCount').textContent = currentStats.labeled || 0;
+        document.getElementById('needsReviewCount').textContent = currentStats.needs_review || 0;
+        document.getElementById('reviewedCount').textContent = currentStats.reviewed || 0;
+        
+        updateSelectionInfo();
+        
+    } catch (error) {
+        console.error('Failed to load export stats:', error);
+        showToast('加载统计信息失败', 'error');
+    }
+}
+
+function updateSelectionInfo() {
+    const exportType = document.getElementById('exportType').value;
+    const exportFormat = document.getElementById('exportFormat').value;
+    
+    // Update displayed info
+    const typeNames = {
+        'all': '全部数据',
+        'labeled': '已标注数据',
+        'unlabeled': '未标注数据',
+        'needs_review': '需复核数据',
+        'reviewed': '已复核数据'
+    };
+    
+    const formatNames = {
+        'csv': 'CSV',
+        'excel': 'Excel',
+        'json': 'JSON'
+    };
+    
+    document.getElementById('selectedType').textContent = typeNames[exportType];
+    document.getElementById('selectedFormat').textContent = formatNames[exportFormat];
+    
+    // Estimate count
+    let estimatedCount = 0;
+    switch (exportType) {
+        case 'all':
+            estimatedCount = currentStats.total || 0;
+            break;
+        case 'labeled':
+            estimatedCount = currentStats.labeled || 0;
+            break;
+        case 'unlabeled':
+            estimatedCount = (currentStats.total || 0) - (currentStats.labeled || 0);
+            break;
+        case 'needs_review':
+            estimatedCount = currentStats.needs_review || 0;
+            break;
+        case 'reviewed':
+            estimatedCount = currentStats.reviewed || 0;
+            break;
+    }
+    
+    document.getElementById('estimatedCount').textContent = estimatedCount;
+    updateFieldCount();
+}
+
+function updateFieldCount() {
+    const checkedFields = document.querySelectorAll('input[type="checkbox"][id^="field_"]:checked');
+    document.getElementById('fieldCount').textContent = checkedFields.length;
+}
+
+function selectAllFields() {
+    document.querySelectorAll('input[type="checkbox"][id^="field_"]').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    updateFieldCount();
+}
+
+function selectNoneFields() {
+    document.querySelectorAll('input[type="checkbox"][id^="field_"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateFieldCount();
+}
+
+function selectEssentialFields() {
+    selectNoneFields();
+    document.getElementById('field_text').checked = true;
+    document.getElementById('field_llm_prediction').checked = true;
+    document.getElementById('field_final_label').checked = true;
+    updateFieldCount();
+}
+
+async function generatePreview() {
+    try {
+        showLoading('生成预览中...', '正在处理数据');
+        
+        // 模拟预览数据（实际应该从API获取）
+        const config = getExportConfig();
+        
+        // 生成预览表格
+        const previewHtml = `
+            <table class="preview-table">
+                <thead>
+                    <tr>
+                        <th>文本内容</th>
+                        <th>LLM预测</th>
+                        <th>人工标注</th>
+                        <th>置信度</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>这个产品很好用，值得推荐</td>
+                        <td>正面</td>
+                        <td>正面</td>
+                        <td>0.89</td>
+                    </tr>
+                    <tr>
+                        <td>服务态度不好，很失望</td>
+                        <td>负面</td>
+                        <td>负面</td>
+                        <td>0.92</td>
+                    </tr>
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">
+                            ... 还有更多数据 ...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+        
+        document.getElementById('exportPreview').innerHTML = previewHtml;
+        hideLoading();
+        
+    } catch (error) {
+        console.error('Preview generation error:', error);
+        showToast('生成预览失败', 'error');
+        hideLoading();
+    }
+}
+
+function getExportConfig() {
+    const selectedFields = [];
+    const fieldMapping = {
+        'field_text': '文本内容',
+        'field_llm_prediction': 'LLM预测',
+        'field_llm_confidence': 'LLM置信度',
+        'field_snownlp_prediction': 'SnowNLP预测',
+        'field_final_label': '人工标注',
+        'field_needs_review': '需要复核',
+        'field_dataset_type': '数据集类型',
+        'field_timestamp': '处理时间'
+    };
+    
+    document.querySelectorAll('input[type="checkbox"][id^="field_"]:checked').forEach(checkbox => {
+        selectedFields.push(fieldMapping[checkbox.id]);
+    });
+    
+    return {
+        type: document.getElementById('exportType').value,
+        format: document.getElementById('exportFormat').value,
+        dataset_filter: document.getElementById('datasetFilter').value,
+        sentiment_filter: document.getElementById('sentimentFilter').value,
+        fields: selectedFields
+    };
+}
+
+async function exportData() {
+    try {
+        const config = getExportConfig();
+        
+        if (config.fields.length === 0) {
+            showToast('请至少选择一个导出字段', 'warning');
+            return;
+        }
+        
+        showLoading('导出数据中...', '正在生成文件');
+        
+        const response = await fetch('/api/export-results', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        if (response.ok) {
+            // 触发文件下载
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            // 从响应头获取文件名
+            const contentDisposition = response.headers.get('Content-Disposition');
+            const filename = contentDisposition ? 
+                contentDisposition.split('filename=')[1].replace(/"/g, '') :
+                `sentiment_export_${new Date().toISOString().split('T')[0]}.${config.format}`;
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showToast('导出成功', 'success');
+            
+            // 添加到导出历史
+            addToExportHistory({
+                filename: filename,
+                type: config.type,
+                format: config.format,
+                count: document.getElementById('estimatedCount').textContent,
+                time: new Date().toLocaleString()
+            });
+            
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || '导出失败');
+        }
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        showToast('导出失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function quickExport(type, format) {
+    document.getElementById('exportType').value = type;
+    document.getElementById('exportFormat').value = format;
+    selectEssentialFields();
+    updateSelectionInfo();
+    await exportData();
+}
+
+function resetConfig() {
+    document.getElementById('exportType').value = 'all';
+    document.getElementById('exportFormat').value = 'csv';
+    document.getElementById('datasetFilter').value = 'all';
+    document.getElementById('sentimentFilter').value = 'all';
+    selectEssentialFields();
+    updateSelectionInfo();
+    
+    document.getElementById('exportPreview').innerHTML = `
+        <div class="text-center text-muted">
+            <i class="bi bi-file-earmark-text" style="font-size: 2rem; opacity: 0.5;"></i>
+            <p class="mt-2 mb-0">点击"生成预览"查看导出内容</p>
+        </div>
+    `;
+}
+
+function addToExportHistory(exportRecord) {
+    let history = JSON.parse(localStorage.getItem('exportHistory') || '[]');
+    history.unshift(exportRecord);
+    history = history.slice(0, 5); // 保留最近5次记录
+    localStorage.setItem('exportHistory', JSON.stringify(history));
+    displayExportHistory(history);
+}
+
+function loadExportHistory() {
+    const history = JSON.parse(localStorage.getItem('exportHistory') || '[]');
+    displayExportHistory(history);
+}
+
+function displayExportHistory(history) {
+    const container = document.getElementById('exportHistory');
+    
+    if (history.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="bi bi-folder-x" style="font-size: 2rem; opacity: 0.5;"></i>
+                <p class="mt-2 mb-0">暂无导出记录</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = history.map(record => `
+        <div class="export-record mb-2 p-2 bg-light bg-opacity-10 rounded">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <h6 class="mb-1 small">${record.filename}</h6>
+                    <div class="d-flex gap-1 mb-1">
+                        <small class="badge bg-info">${record.count} 条</small>
+                        <small class="badge bg-secondary">${record.format.toUpperCase()}</small>
+                    </div>
+                </div>
+            </div>
+            <small class="text-muted">${record.time}</small>
+        </div>
+    `).join('');
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}模型训练 - 情感分析助手{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="fas fa-cogs text-success me-2"></i>模型训练
+    </h2>
+    <button class="btn btn-outline-primary" onclick="loadTrainingData()">
+        <i class="fas fa-sync-alt me-2"></i>刷新数据
+    </button>
+</div>
+
+<!-- 训练数据概览 -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-database fa-2x mb-3"></i>
+                <h3 class="card-title" id="totalTrainingData">0</h3>
+                <p class="card-text">总训练数据</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-smile fa-2x mb-3"></i>
+                <h3 class="card-title" id="positiveTrainingData">0</h3>
+                <p class="card-text">正面样本</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-frown fa-2x mb-3"></i>
+                <h3 class="card-title" id="negativeTrainingData">0</h3>
+                <p class="card-text">负面样本</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-balance-scale fa-2x mb-3"></i>
+                <h3 class="card-title" id="dataBalance">0%</h3>
+                <p class="card-text">数据平衡度</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 训练配置 -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-sliders-h me-2"></i>训练配置
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="trainTestSplit" class="form-label">训练/测试分割比例</label>
+                    <select id="trainTestSplit" class="form-select">
+                        <option value="0.8">80% 训练 / 20% 测试</option>
+                        <option value="0.7">70% 训练 / 30% 测试</option>
+                        <option value="0.9">90% 训练 / 10% 测试</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="modelType" class="form-label">模型类型</label>
+                    <select id="modelType" class="form-select">
+                        <option value="naive_bayes">朴素贝叶斯</option>
+                        <option value="svm">支持向量机</option>
+                        <option value="logistic">逻辑回归</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="maxFeatures" class="form-label">最大特征数</label>
+                    <input type="number" id="maxFeatures" class="form-control" value="5000" min="1000" max="20000">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="ngramRange" class="form-label">N-gram 范围</label>
+                    <select id="ngramRange" class="form-select">
+                        <option value="1,1">1-gram (单词)</option>
+                        <option value="1,2" selected>1-2 gram (单词+词组)</option>
+                        <option value="1,3">1-3 gram (单词+词组+短语)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 训练控制 -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-play me-2"></i>开始训练
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="alert alert-info mb-3">
+                    <h6><i class="fas fa-info-circle me-2"></i>训练说明：</h6>
+                    <ul class="mb-0">
+                        <li>确保至少有 10 条已标注的训练数据</li>
+                        <li>数据分布尽量平衡（正面和负面样本数量接近）</li>
+                        <li>训练过程可能需要几分钟时间</li>
+                        <li>训练完成后可以在评估页面查看效果</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-grid">
+                    <button id="trainButton" class="btn btn-success btn-lg" onclick="startTraining()">
+                        <i class="fas fa-play me-2"></i>开始训练
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 训练进度 -->
+        <div id="trainingProgress" class="mt-4" style="display: none;">
+            <div class="d-flex align-items-center mb-3">
+                <div class="spinner-border spinner-border-sm me-3" role="status"></div>
+                <span class="fw-bold">训练进行中...</span>
+            </div>
+            <div class="progress">
+                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                     style="width: 0%"></div>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted" id="progressText">准备训练数据...</small>
+            </div>
+        </div>
+        
+        <!-- 训练结果 -->
+        <div id="trainingResult" class="mt-4" style="display: none;">
+            <div class="alert alert-success">
+                <h6><i class="fas fa-check-circle me-2"></i>训练完成！</h6>
+                <div id="resultSummary"></div>
+                <div class="mt-3">
+                    <a href="/evaluate" class="btn btn-primary">
+                        <i class="fas fa-chart-line me-2"></i>查看详细评估
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 训练历史 -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-history me-2"></i>训练历史
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>训练时间</th>
+                        <th>数据量</th>
+                        <th>模型类型</th>
+                        <th>准确率</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody id="trainingHistory">
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">
+                            <i class="fas fa-clock fa-2x mb-2"></i><br>
+                            暂无训练历史
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 数据分布图表 -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>标签分布
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="labelDistributionChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>文本长度分布
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="textLengthChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let trainingData = [];
+let labelDistributionChart = null;
+let textLengthChart = null;
+
+// 页面加载时获取数据
+document.addEventListener('DOMContentLoaded', function() {
+    loadTrainingData();
+});
+
+// 加载训练数据
+async function loadTrainingData() {
+    try {
+        const response = await fetch('/api/data');
+        const allData = await response.json();
+        
+        // 筛选有标签的数据作为训练数据
+        trainingData = allData.filter(item => item.label !== undefined);
+        
+        updateTrainingStats();
+        updateCharts();
+        checkTrainingReadiness();
+        
+    } catch (error) {
+        console.error('加载训练数据失败:', error);
+        showToast('加载训练数据失败', 'error');
+    }
+}
+
+// 更新训练统计
+function updateTrainingStats() {
+    const totalData = trainingData.length;
+    const positiveData = trainingData.filter(item => item.label === 1).length;
+    const negativeData = trainingData.filter(item => item.label === 0).length;
+    
+    // 计算数据平衡度
+    let balance = 0;
+    if (totalData > 0) {
+        const ratio = Math.min(positiveData, negativeData) / Math.max(positiveData, negativeData);
+        balance = Math.round(ratio * 100);
+    }
+    
+    document.getElementById('totalTrainingData').textContent = totalData;
+    document.getElementById('positiveTrainingData').textContent = positiveData;
+    document.getElementById('negativeTrainingData').textContent = negativeData;
+    document.getElementById('dataBalance').textContent = balance + '%';
+}
+
+// 更新图表
+function updateCharts() {
+    updateLabelDistributionChart();
+    updateTextLengthChart();
+}
+
+// 更新标签分布图
+function updateLabelDistributionChart() {
+    const ctx = document.getElementById('labelDistributionChart').getContext('2d');
+    
+    if (labelDistributionChart) {
+        labelDistributionChart.destroy();
+    }
+    
+    const positiveCount = trainingData.filter(item => item.label === 1).length;
+    const negativeCount = trainingData.filter(item => item.label === 0).length;
+    
+    labelDistributionChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['正面情感', '负面情感'],
+            datasets: [{
+                data: [positiveCount, negativeCount],
+                backgroundColor: ['#28a745', '#dc3545'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// 更新文本长度分布图
+function updateTextLengthChart() {
+    const ctx = document.getElementById('textLengthChart').getContext('2d');
+    
+    if (textLengthChart) {
+        textLengthChart.destroy();
+    }
+    
+    // 计算文本长度分布
+    const lengths = trainingData.map(item => item.text.length);
+    const bins = [0, 50, 100, 200, 500, 1000];
+    const counts = new Array(bins.length - 1).fill(0);
+    
+    lengths.forEach(length => {
+        for (let i = 0; i < bins.length - 1; i++) {
+            if (length >= bins[i] && length < bins[i + 1]) {
+                counts[i]++;
+                break;
+            }
+        }
+    });
+    
+    const labels = bins.slice(0, -1).map((bin, i) => `${bin}-${bins[i + 1]}`);
+    
+    textLengthChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '文本数量',
+                data: counts,
+                backgroundColor: '#667eea',
+                borderColor: '#764ba2',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+// 检查训练准备状态
+function checkTrainingReadiness() {
+    const trainButton = document.getElementById('trainButton');
+    
+    if (trainingData.length < 10) {
+        trainButton.disabled = true;
+        trainButton.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>数据不足（需要至少10条）';
+        trainButton.className = 'btn btn-warning btn-lg disabled';
+    } else {
+        trainButton.disabled = false;
+        trainButton.innerHTML = '<i class="fas fa-play me-2"></i>开始训练';
+        trainButton.className = 'btn btn-success btn-lg';
+    }
+}
+
+// 开始训练
+async function startTraining() {
+    if (trainingData.length < 10) {
+        showToast('训练数据不足，至少需要10条已标注数据', 'warning');
+        return;
+    }
+    
+    // 显示训练进度
+    document.getElementById('trainButton').disabled = true;
+    document.getElementById('trainingProgress').style.display = 'block';
+    document.getElementById('trainingResult').style.display = 'none';
+    
+    // 模拟训练进度
+    simulateTrainingProgress();
+    
+    try {
+        const response = await fetch('/api/train_model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                train_test_split: parseFloat(document.getElementById('trainTestSplit').value),
+                model_type: document.getElementById('modelType').value,
+                max_features: parseInt(document.getElementById('maxFeatures').value),
+                ngram_range: document.getElementById('ngramRange').value
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            showTrainingSuccess(result.message);
+            showToast('模型训练完成', 'success');
+            
+            // 添加到训练历史
+            addTrainingHistory({
+                time: new Date().toLocaleString(),
+                dataCount: trainingData.length,
+                modelType: document.getElementById('modelType').value,
+                accuracy: 'N/A',
+                status: '成功'
+            });
+            
+        } else {
+            showTrainingError(result.message);
+            showToast(result.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('训练失败:', error);
+        showTrainingError('训练过程中出现错误');
+        showToast('训练失败，请重试', 'error');
+    } finally {
+        document.getElementById('trainButton').disabled = false;
+        document.getElementById('trainingProgress').style.display = 'none';
+    }
+}
+
+// 模拟训练进度
+function simulateTrainingProgress() {
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    
+    const steps = [
+        { progress: 20, text: '准备训练数据...' },
+        { progress: 40, text: '特征提取中...' },
+        { progress: 60, text: '训练模型中...' },
+        { progress: 80, text: '验证模型...' },
+        { progress: 100, text: '保存模型...' }
+    ];
+    
+    let currentStep = 0;
+    
+    const interval = setInterval(() => {
+        if (currentStep < steps.length) {
+            const step = steps[currentStep];
+            progressBar.style.width = step.progress + '%';
+            progressText.textContent = step.text;
+            currentStep++;
+        } else {
+            clearInterval(interval);
+        }
+    }, 1000);
+}
+
+// 显示训练成功
+function showTrainingSuccess(message) {
+    const resultDiv = document.getElementById('trainingResult');
+    const summaryDiv = document.getElementById('resultSummary');
+    
+    summaryDiv.innerHTML = `
+        <p><strong>训练结果：</strong>${message}</p>
+        <p><strong>训练数据量：</strong>${trainingData.length} 条</p>
+        <p><strong>模型类型：</strong>${document.getElementById('modelType').options[document.getElementById('modelType').selectedIndex].text}</p>
+    `;
+    
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'mt-4';
+    resultDiv.innerHTML = `
+        <div class="alert alert-success">
+            <h6><i class="fas fa-check-circle me-2"></i>训练完成！</h6>
+            ${summaryDiv.innerHTML}
+            <div class="mt-3">
+                <a href="/evaluate" class="btn btn-primary">
+                    <i class="fas fa-chart-line me-2"></i>查看详细评估
+                </a>
+            </div>
+        </div>
+    `;
+}
+
+// 显示训练错误
+function showTrainingError(message) {
+    const resultDiv = document.getElementById('trainingResult');
+    
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'mt-4';
+    resultDiv.innerHTML = `
+        <div class="alert alert-danger">
+            <h6><i class="fas fa-exclamation-circle me-2"></i>训练失败</h6>
+            <p>${message}</p>
+            <div class="mt-3">
+                <button class="btn btn-warning" onclick="startTraining()">
+                    <i class="fas fa-redo me-2"></i>重新训练
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// 添加训练历史
+function addTrainingHistory(record) {
+    const tbody = document.getElementById('trainingHistory');
+    
+    // 如果是第一条记录，清空占位内容
+    if (tbody.children.length === 1 && tbody.children[0].children.length === 1) {
+        tbody.innerHTML = '';
+    }
+    
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>${record.time}</td>
+        <td>${record.dataCount}</td>
+        <td>${record.modelType}</td>
+        <td>${record.accuracy}</td>
+        <td><span class="badge bg-success">${record.status}</span></td>
+    `;
+    
+    tbody.insertBefore(row, tbody.firstChild);
+}
+</script>
+{% endblock %} 

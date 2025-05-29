@@ -1,0 +1,600 @@
+{% extends "base.html" %}
+
+{% block title %}数据标注 - 情感分析助手{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="fas fa-tags text-primary me-2"></i>数据标注
+    </h2>
+    <div>
+        <button class="btn btn-outline-primary" onclick="loadData()">
+            <i class="fas fa-sync-alt me-2"></i>刷新数据
+        </button>
+        <button class="btn btn-success" onclick="exportData()">
+            <i class="fas fa-download me-2"></i>导出数据
+        </button>
+    </div>
+</div>
+
+<!-- 添加新数据表单 -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-plus me-2"></i>添加新的文本数据
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="mb-3">
+                    <label for="newText" class="form-label">文本内容</label>
+                    <textarea id="newText" class="form-control" rows="3" 
+                              placeholder="请输入要标注的中文文本..."></textarea>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <label class="form-label">操作</label>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="getLLMSuggestion()">
+                            <i class="fas fa-robot me-2"></i>获取 LLM 建议
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="addManualData()">
+                            <i class="fas fa-hand-paper me-2"></i>手动添加
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- LLM 建议结果 -->
+        <div id="llmSuggestion" class="alert alert-info" style="display: none;">
+            <h6><i class="fas fa-lightbulb me-2"></i>LLM 建议：</h6>
+            <div id="suggestionContent"></div>
+            <div class="mt-3">
+                <button class="btn btn-success btn-sm" onclick="acceptSuggestion(1)">
+                    <i class="fas fa-thumbs-up me-1"></i>接受（正面）
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="acceptSuggestion(0)">
+                    <i class="fas fa-thumbs-down me-1"></i>接受（负面）
+                </button>
+                <button class="btn btn-warning btn-sm" onclick="showManualLabel()">
+                    <i class="fas fa-edit me-1"></i>手动标注
+                </button>
+            </div>
+        </div>
+        
+        <!-- 手动标注选项 -->
+        <div id="manualLabel" class="mt-3" style="display: none;">
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">选择情感标签</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="manualSentiment" id="positive" value="1">
+                        <label class="btn btn-outline-success" for="positive">
+                            <i class="fas fa-smile me-1"></i>正面
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="manualSentiment" id="negative" value="0">
+                        <label class="btn btn-outline-danger" for="negative">
+                            <i class="fas fa-frown me-1"></i>负面
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid">
+                        <button class="btn btn-primary" onclick="saveManualLabel()">
+                            <i class="fas fa-save me-2"></i>保存标注
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading-spinner mt-3">
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                <span id="loadingText">处理中...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 已标注数据列表 -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>已标注数据
+            <span class="badge bg-primary" id="dataCount">0</span>
+        </h5>
+        <div class="d-flex gap-2">
+            <select id="filterSentiment" class="form-select form-select-sm" onchange="filterData()">
+                <option value="">全部</option>
+                <option value="1">正面</option>
+                <option value="0">负面</option>
+                <option value="unlabeled">未标注</option>
+            </select>
+            <div class="input-group input-group-sm">
+                <input type="text" id="searchText" class="form-control" placeholder="搜索文本..." onkeyup="searchData()">
+                <button class="btn btn-outline-secondary" onclick="searchData()">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th width="5%">#</th>
+                        <th width="50%">文本内容</th>
+                        <th width="15%">情感标签</th>
+                        <th width="15%">置信度</th>
+                        <th width="15%">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody">
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                            暂无数据，请先添加文本进行标注
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 分页 -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="text-muted">
+                显示第 <span id="pageStart">0</span> - <span id="pageEnd">0</span> 条，共 <span id="totalCount">0</span> 条
+            </div>
+            <nav>
+                <ul class="pagination pagination-sm mb-0" id="pagination">
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑模态框 -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>编辑标注
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">文本内容</label>
+                    <textarea id="editText" class="form-control" rows="3" readonly></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">情感标签</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="editSentiment" id="editPositive" value="1">
+                        <label class="btn btn-outline-success" for="editPositive">
+                            <i class="fas fa-smile me-1"></i>正面
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="editSentiment" id="editNegative" value="0">
+                        <label class="btn btn-outline-danger" for="editNegative">
+                            <i class="fas fa-frown me-1"></i>负面
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="updateLabel()">
+                    <i class="fas fa-save me-2"></i>保存更改
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allData = [];
+let filteredData = [];
+let currentPage = 1;
+let pageSize = 10;
+let editingIndex = -1;
+
+// 页面加载时获取数据
+document.addEventListener('DOMContentLoaded', function() {
+    loadData();
+});
+
+// 加载数据
+async function loadData() {
+    try {
+        const response = await fetch('/api/data');
+        allData = await response.json();
+        filteredData = [...allData];
+        updateDataTable();
+        updateDataCount();
+    } catch (error) {
+        console.error('加载数据失败:', error);
+        showToast('加载数据失败', 'error');
+    }
+}
+
+// 获取 LLM 建议
+async function getLLMSuggestion() {
+    const text = document.getElementById('newText').value.trim();
+    if (!text) {
+        showToast('请输入文本内容', 'warning');
+        return;
+    }
+    
+    document.getElementById('loadingText').textContent = '获取 LLM 建议中...';
+    toggleLoading(true);
+    
+    try {
+        const response = await fetch('/api/llm_suggest', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ text: text })
+        });
+        
+        const result = await response.json();
+        
+        // 显示建议
+        const suggestionDiv = document.getElementById('suggestionContent');
+        const sentiment = result.llm_suggestion === 1 ? '正面' : '负面';
+        const confidence = (result.confidence_score * 100).toFixed(1);
+        
+        suggestionDiv.innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <strong>LLM 建议：</strong>
+                    <span class="badge ${sentiment === '正面' ? 'bg-success' : 'bg-danger'} fs-6">
+                        ${sentiment}
+                    </span>
+                </div>
+                <div class="col-md-4">
+                    <strong>置信度：</strong>
+                    <span class="text-primary">${confidence}%</span>
+                </div>
+                <div class="col-md-4">
+                    <strong>SnowNLP：</strong>
+                    <span class="text-muted">${result.snownlp_prediction === 1 ? '正面' : '负面'}</span>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('llmSuggestion').style.display = 'block';
+        
+    } catch (error) {
+        console.error('获取建议失败:', error);
+        showToast('获取建议失败', 'error');
+    } finally {
+        toggleLoading(false);
+    }
+}
+
+// 接受建议
+async function acceptSuggestion(label) {
+    const text = document.getElementById('newText').value.trim();
+    await saveData(text, label);
+}
+
+// 显示手动标注
+function showManualLabel() {
+    document.getElementById('manualLabel').style.display = 'block';
+}
+
+// 添加手动数据
+function addManualData() {
+    const text = document.getElementById('newText').value.trim();
+    if (!text) {
+        showToast('请输入文本内容', 'warning');
+        return;
+    }
+    
+    document.getElementById('llmSuggestion').style.display = 'none';
+    document.getElementById('manualLabel').style.display = 'block';
+}
+
+// 保存手动标注
+async function saveManualLabel() {
+    const text = document.getElementById('newText').value.trim();
+    const selectedLabel = document.querySelector('input[name="manualSentiment"]:checked');
+    
+    if (!text) {
+        showToast('请输入文本内容', 'warning');
+        return;
+    }
+    
+    if (!selectedLabel) {
+        showToast('请选择情感标签', 'warning');
+        return;
+    }
+    
+    await saveData(text, parseInt(selectedLabel.value));
+}
+
+// 保存数据
+async function saveData(text, label) {
+    document.getElementById('loadingText').textContent = '保存数据中...';
+    toggleLoading(true);
+    
+    try {
+        const response = await fetch('/api/data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: text,
+                label: label
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            showToast('数据保存成功', 'success');
+            
+            // 清空表单
+            document.getElementById('newText').value = '';
+            document.getElementById('llmSuggestion').style.display = 'none';
+            document.getElementById('manualLabel').style.display = 'none';
+            document.querySelectorAll('input[name="manualSentiment"]').forEach(input => input.checked = false);
+            
+            // 重新加载数据
+            await loadData();
+        } else {
+            showToast('数据保存失败', 'error');
+        }
+        
+    } catch (error) {
+        console.error('保存数据失败:', error);
+        showToast('保存数据失败', 'error');
+    } finally {
+        toggleLoading(false);
+    }
+}
+
+// 更新数据表格
+function updateDataTable() {
+    const tableBody = document.getElementById('dataTableBody');
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, filteredData.length);
+    const pageData = filteredData.slice(startIndex, endIndex);
+    
+    if (pageData.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted">
+                    <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                    暂无数据
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tableBody.innerHTML = pageData.map((item, index) => {
+        const actualIndex = startIndex + index;
+        const sentiment = item.label !== undefined ? (item.label === 1 ? '正面' : '负面') : '未标注';
+        const badgeClass = item.label === 1 ? 'bg-success' : (item.label === 0 ? 'bg-danger' : 'bg-secondary');
+        const confidence = item.confidence_score ? (item.confidence_score * 100).toFixed(1) + '%' : '-';
+        
+        return `
+            <tr>
+                <td>${actualIndex + 1}</td>
+                <td>
+                    <div class="text-truncate" style="max-width: 300px;" title="${item.text}">
+                        ${item.text}
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${badgeClass}">${sentiment}</span>
+                </td>
+                <td>${confidence}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="editLabel(${actualIndex})" title="编辑">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="deleteData(${actualIndex})" title="删除">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    updatePagination();
+    updatePageInfo();
+}
+
+// 更新分页
+function updatePagination() {
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    const pagination = document.getElementById('pagination');
+    
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let paginationHTML = '';
+    
+    // 上一页
+    paginationHTML += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">上一页</a>
+        </li>
+    `;
+    
+    // 页码
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || Math.abs(i - currentPage) <= 2) {
+            paginationHTML += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                </li>
+            `;
+        } else if (Math.abs(i - currentPage) === 3) {
+            paginationHTML += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+    }
+    
+    // 下一页
+    paginationHTML += `
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">下一页</a>
+        </li>
+    `;
+    
+    pagination.innerHTML = paginationHTML;
+}
+
+// 更新页面信息
+function updatePageInfo() {
+    const startIndex = (currentPage - 1) * pageSize + 1;
+    const endIndex = Math.min(currentPage * pageSize, filteredData.length);
+    
+    document.getElementById('pageStart').textContent = filteredData.length > 0 ? startIndex : 0;
+    document.getElementById('pageEnd').textContent = endIndex;
+    document.getElementById('totalCount').textContent = filteredData.length;
+}
+
+// 更新数据计数
+function updateDataCount() {
+    document.getElementById('dataCount').textContent = allData.length;
+}
+
+// 切换页面
+function changePage(page) {
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        updateDataTable();
+    }
+}
+
+// 过滤数据
+function filterData() {
+    const filterValue = document.getElementById('filterSentiment').value;
+    
+    if (filterValue === '') {
+        filteredData = [...allData];
+    } else if (filterValue === 'unlabeled') {
+        filteredData = allData.filter(item => item.label === undefined);
+    } else {
+        filteredData = allData.filter(item => item.label === parseInt(filterValue));
+    }
+    
+    currentPage = 1;
+    updateDataTable();
+}
+
+// 搜索数据
+function searchData() {
+    const searchText = document.getElementById('searchText').value.toLowerCase();
+    
+    if (searchText === '') {
+        filterData(); // 重新应用过滤器
+        return;
+    }
+    
+    const filterValue = document.getElementById('filterSentiment').value;
+    let baseData = allData;
+    
+    if (filterValue === 'unlabeled') {
+        baseData = allData.filter(item => item.label === undefined);
+    } else if (filterValue !== '') {
+        baseData = allData.filter(item => item.label === parseInt(filterValue));
+    }
+    
+    filteredData = baseData.filter(item => 
+        item.text.toLowerCase().includes(searchText)
+    );
+    
+    currentPage = 1;
+    updateDataTable();
+}
+
+// 编辑标签
+function editLabel(index) {
+    editingIndex = index;
+    const item = filteredData[index];
+    
+    document.getElementById('editText').value = item.text;
+    
+    if (item.label !== undefined) {
+        document.getElementById(item.label === 1 ? 'editPositive' : 'editNegative').checked = true;
+    }
+    
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+// 更新标签
+async function updateLabel() {
+    const selectedLabel = document.querySelector('input[name="editSentiment"]:checked');
+    
+    if (!selectedLabel) {
+        showToast('请选择情感标签', 'warning');
+        return;
+    }
+    
+    const item = filteredData[editingIndex];
+    const originalIndex = allData.findIndex(data => data.text === item.text && data.timestamp === item.timestamp);
+    
+    if (originalIndex !== -1) {
+        allData[originalIndex].label = parseInt(selectedLabel.value);
+        
+        // 这里应该调用API更新数据，目前暂时只更新本地数据
+        showToast('标签更新成功', 'success');
+        updateDataTable();
+        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+    }
+}
+
+// 删除数据
+function deleteData(index) {
+    if (confirm('确定要删除这条数据吗？')) {
+        const item = filteredData[index];
+        const originalIndex = allData.findIndex(data => data.text === item.text && data.timestamp === item.timestamp);
+        
+        if (originalIndex !== -1) {
+            allData.splice(originalIndex, 1);
+            filteredData.splice(index, 1);
+            
+            // 这里应该调用API删除数据，目前暂时只删除本地数据
+            showToast('数据删除成功', 'success');
+            updateDataTable();
+            updateDataCount();
+        }
+    }
+}
+
+// 导出数据
+function exportData() {
+    const dataStr = JSON.stringify(allData, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `sentiment_data_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    
+    showToast('数据导出成功', 'success');
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,854 @@
+{% extends "base.html" %}
+
+{% block title %}LLM配置 - 情感分析系统{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="glass-card text-center mb-5">
+    <h1 class="display-5 fw-bold mb-3">
+        <i class="bi bi-gear text-gradient me-3"></i>LLM配置
+    </h1>
+    <p class="lead">配置大语言模型API，支持多种平台和自定义参数</p>
+</div>
+
+<div class="row g-4">
+    <!-- Configuration Form -->
+    <div class="col-lg-8">
+        <div class="glass-card">
+            <form id="configForm">
+                <!-- API Platform Selection -->
+                <div class="mb-4">
+                    <h4 class="mb-3">
+                        <i class="bi bi-cloud me-2"></i>API平台选择
+                    </h4>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="api-option" data-value="openai">
+                                <input type="radio" name="api_type" value="openai" id="openai" checked>
+                                <label for="openai" class="api-label">
+                                    <div class="api-icon">
+                                        <i class="bi bi-robot"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">OpenAI</h6>
+                                        <small class="text-muted">GPT系列模型</small>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="api-option" data-value="custom">
+                                <input type="radio" name="api_type" value="custom" id="custom">
+                                <label for="custom" class="api-label">
+                                    <div class="api-icon">
+                                        <i class="bi bi-terminal"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">自定义API</h6>
+                                        <small class="text-muted">兼容OpenAI格式</small>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Configuration -->
+                <div class="mb-4">
+                    <h4 class="mb-3">
+                        <i class="bi bi-key me-2"></i>API配置
+                    </h4>
+                    
+                    <div class="row g-3">
+                        <div class="col-12" id="baseUrlGroup">
+                            <label for="baseUrl" class="form-label">API基础URL</label>
+                            <input type="url" id="baseUrl" class="form-control-modern" 
+                                   placeholder="https://api.openai.com/v1">
+                            <div class="form-text text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                留空使用默认URL，自定义API请填写完整URL
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label for="apiKey" class="form-label">API密钥</label>
+                            <div class="input-group">
+                                <input type="password" id="apiKey" class="form-control-modern" 
+                                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                                <button type="button" class="btn btn-outline-light" onclick="toggleApiKeyVisibility()">
+                                    <i class="bi bi-eye" id="apiKeyToggleIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="modelName" class="form-label">模型名称</label>
+                            <div class="input-group">
+                                <select id="modelName" class="form-select-modern">
+                                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                                    <option value="gpt-3.5-turbo-16k">gpt-3.5-turbo-16k</option>
+                                    <option value="gpt-4">gpt-4</option>
+                                    <option value="gpt-4-turbo-preview">gpt-4-turbo-preview</option>
+                                    <option value="qwen-turbo">通义千问-turbo</option>
+                                    <option value="glm-4">智谱GLM-4</option>
+                                    <option value="custom">自定义模型</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-light" onclick="enableCustomModel()">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </div>
+                            <input type="text" id="customModelName" class="form-control-modern mt-2" 
+                                   placeholder="输入自定义模型名称" style="display: none;">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="batchSize" class="form-label">
+                                批量处理大小
+                                <span class="badge bg-info ms-2" id="batchSizeBadge">5</span>
+                            </label>
+                            <input type="range" id="batchSize" class="form-range" 
+                                   min="1" max="20" value="5" oninput="updateBatchSizeBadge(this.value)">
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span>单条</span>
+                                <span>批量</span>
+                            </div>
+                            <div class="form-text text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                每次向LLM发送的文本数量，建议3-10条
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="timeout" class="form-label">超时时间（秒）</label>
+                            <input type="number" id="timeout" class="form-control-modern" 
+                                   value="30" min="5" max="120">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Processing Parameters -->
+                <div class="mb-4">
+                    <h4 class="mb-3">
+                        <i class="bi bi-sliders me-2"></i>处理参数
+                    </h4>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="maxConcurrent" class="form-label">
+                                最大并发数
+                                <span class="badge bg-info ms-2" id="concurrentBadge">5</span>
+                            </label>
+                            <input type="range" id="maxConcurrent" class="form-range" 
+                                   min="1" max="20" value="5" oninput="updateConcurrentBadge(this.value)">
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span>1</span>
+                                <span>20</span>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="temperature" class="form-label">
+                                Temperature
+                                <span class="badge bg-warning ms-2" id="tempBadge">0.1</span>
+                            </label>
+                            <input type="range" id="temperature" class="form-range" 
+                                   min="0" max="1" step="0.1" value="0.1" oninput="updateTempBadge(this.value)">
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span>确定性</span>
+                                <span>创造性</span>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="maxTokens" class="form-label">最大Token数</label>
+                            <input type="number" id="maxTokens" class="form-control-modern" 
+                                   value="10" min="1" max="100">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="retryCount" class="form-label">重试次数</label>
+                            <input type="number" id="retryCount" class="form-control-modern" 
+                                   value="3" min="0" max="10">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prompt Template -->
+                <div class="mb-4">
+                    <h4 class="mb-3">
+                        <i class="bi bi-chat-text me-2"></i>Prompt模板
+                    </h4>
+                    
+                    <div class="mb-3">
+                        <label for="promptTemplate" class="form-label">自定义Prompt</label>
+                        <textarea id="promptTemplate" class="form-control-modern" rows="6" 
+                                  placeholder="请分析以下中文文本的情感倾向，对每条文本只回答"正面"或"负面"，按顺序返回结果，用换行符分隔：
+
+{batch_texts}
+
+请按顺序返回每条文本的情感分析结果："></textarea>
+                        <div class="form-text text-muted">
+                            <i class="bi bi-lightbulb me-1"></i>
+                            使用 {batch_texts} 作为占位符，系统会自动替换为批量文本
+                        </div>
+                    </div>
+                    
+                    <div class="row g-2">
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-outline-light btn-sm" onclick="useDefaultPrompt()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>恢复默认
+                            </button>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-outline-light btn-sm" onclick="previewPrompt()">
+                                <i class="bi bi-eye me-1"></i>预览效果
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex gap-3 justify-content-center">
+                    <button type="button" class="btn btn-success-modern" onclick="testConnection()">
+                        <i class="bi bi-wifi me-2"></i>测试连接
+                    </button>
+                    <button type="button" class="btn btn-modern" onclick="saveConfig()">
+                        <i class="bi bi-check-circle me-2"></i>保存配置
+                    </button>
+                    <button type="button" class="btn btn-outline-light" onclick="loadConfig()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>重新加载
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Status Panel -->
+    <div class="col-lg-4">
+        <!-- Connection Status -->
+        <div class="glass-card glass-card-sm mb-4">
+            <h5 class="mb-3">
+                <i class="bi bi-activity me-2"></i>连接状态
+            </h5>
+            
+            <div id="connectionStatus" class="text-center">
+                <div class="status-indicator mb-3">
+                    <div class="status-dot status-unknown"></div>
+                </div>
+                <h6 id="statusText">未测试</h6>
+                <p class="text-muted mb-0" id="statusDetail">请先配置API并测试连接</p>
+            </div>
+        </div>
+        
+        <!-- Test Results -->
+        <div class="glass-card glass-card-sm mb-4">
+            <h5 class="mb-3">
+                <i class="bi bi-clipboard-check me-2"></i>测试结果
+            </h5>
+            
+            <div id="testResults">
+                <div class="text-center text-muted">
+                    <i class="bi bi-hourglass-split" style="font-size: 2rem; opacity: 0.5;"></i>
+                    <p class="mt-2 mb-0">等待测试</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Performance Tips -->
+        <div class="glass-card glass-card-sm">
+            <h5 class="mb-3">
+                <i class="bi bi-lightbulb me-2"></i>性能建议
+            </h5>
+            
+            <div class="tips-list">
+                <div class="tip-item mb-3">
+                    <i class="bi bi-speedometer2 text-info me-2"></i>
+                    <div>
+                        <strong>并发处理</strong>
+                        <div class="small text-muted">根据API限制调整并发数，避免过载</div>
+                    </div>
+                </div>
+                
+                <div class="tip-item mb-3">
+                    <i class="bi bi-shield-check text-success me-2"></i>
+                    <div>
+                        <strong>稳定性</strong>
+                        <div class="small text-muted">设置合适的超时和重试次数</div>
+                    </div>
+                </div>
+                
+                <div class="tip-item mb-3">
+                    <i class="bi bi-currency-dollar text-warning me-2"></i>
+                    <div>
+                        <strong>成本控制</strong>
+                        <div class="small text-muted">使用较小的Token数和低Temperature</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Prompt Preview Modal -->
+<div class="modal fade" id="promptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">
+                    <i class="bi bi-eye me-2"></i>Prompt预览
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">示例文本</label>
+                    <input type="text" id="previewText" class="form-control-modern" 
+                           value="这个产品质量很好，值得推荐。">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">生成的Prompt</label>
+                    <div id="previewResult" class="preview-box"></div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.api-option {
+    height: 100%;
+}
+
+.api-option input[type="radio"] {
+    display: none;
+}
+
+.api-label {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid var(--glass-border);
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    height: 100%;
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.api-label:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #667eea;
+    transform: translateY(-2px);
+    color: var(--text-primary);
+}
+
+.api-option input[type="radio"]:checked + .api-label {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+}
+
+.api-icon {
+    width: 50px;
+    height: 50px;
+    background: var(--primary-gradient);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.form-range {
+    background: transparent;
+}
+
+.form-range::-webkit-slider-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    height: 8px;
+}
+
+.form-range::-webkit-slider-thumb {
+    background: var(--primary-gradient);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.status-indicator {
+    display: flex;
+    justify-content: center;
+}
+
+.status-dot {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status-dot::before {
+    content: '';
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.status-unknown {
+    color: #6c757d;
+}
+
+.status-success {
+    color: #28a745;
+    animation: pulse-success 2s infinite;
+}
+
+.status-error {
+    color: #dc3545;
+    animation: pulse-error 2s infinite;
+}
+
+.status-testing {
+    color: #ffc107;
+    animation: pulse-testing 1s infinite;
+}
+
+@keyframes pulse-success {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+    50% { box-shadow: 0 0 0 20px rgba(40, 167, 69, 0); }
+}
+
+@keyframes pulse-error {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    50% { box-shadow: 0 0 0 20px rgba(220, 53, 69, 0); }
+}
+
+@keyframes pulse-testing {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+    50% { box-shadow: 0 0 0 15px rgba(255, 193, 7, 0); }
+}
+
+.tip-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+.preview-box {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    padding: 1rem;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .api-label {
+        padding: 1rem;
+    }
+    
+    .api-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+    }
+    
+    .status-dot {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .status-dot::before {
+        width: 30px;
+        height: 30px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let configData = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfig();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // API type change
+    document.querySelectorAll('input[name="api_type"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            updateApiTypeUI(this.value);
+        });
+    });
+    
+    // Model name input for custom option
+    const modelSelect = document.getElementById('modelName');
+    modelSelect.addEventListener('focus', function() {
+        const apiType = document.querySelector('input[name="api_type"]:checked').value;
+        if (apiType === 'custom') {
+            // Convert select to input for custom models
+            this.setAttribute('list', 'modelDatalist');
+        }
+    });
+}
+
+function updateApiTypeUI(apiType) {
+    const baseUrlGroup = document.getElementById('baseUrlGroup');
+    const modelSelect = document.getElementById('modelName');
+    
+    if (apiType === 'custom') {
+        baseUrlGroup.style.display = 'block';
+        // Add common model options for custom APIs
+        modelSelect.innerHTML = `
+            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+            <option value="qwen-turbo">qwen-turbo</option>
+            <option value="glm-4">glm-4</option>
+            <option value="custom-model">自定义模型</option>
+        `;
+    } else {
+        baseUrlGroup.style.display = 'none';
+        // OpenAI models
+        modelSelect.innerHTML = `
+            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+            <option value="gpt-3.5-turbo-16k">gpt-3.5-turbo-16k</option>
+            <option value="gpt-4">gpt-4</option>
+            <option value="gpt-4-turbo-preview">gpt-4-turbo-preview</option>
+        `;
+    }
+}
+
+function updateConcurrentBadge(value) {
+    document.getElementById('concurrentBadge').textContent = value;
+}
+
+function updateTempBadge(value) {
+    document.getElementById('tempBadge').textContent = value;
+}
+
+function toggleApiKeyVisibility() {
+    const apiKeyInput = document.getElementById('apiKey');
+    const toggleIcon = document.getElementById('apiKeyToggleIcon');
+    
+    if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text';
+        toggleIcon.className = 'bi bi-eye-slash';
+    } else {
+        apiKeyInput.type = 'password';
+        toggleIcon.className = 'bi bi-eye';
+    }
+}
+
+function updateBatchSizeBadge(value) {
+    document.getElementById('batchSizeBadge').textContent = value;
+}
+
+function enableCustomModel() {
+    const select = document.getElementById('modelName');
+    const customInput = document.getElementById('customModelName');
+    
+    if (customInput.style.display === 'none') {
+        customInput.style.display = 'block';
+        customInput.focus();
+        select.value = 'custom';
+    } else {
+        customInput.style.display = 'none';
+        if (customInput.value.trim()) {
+            // 如果有自定义值，添加到选项中
+            const customOption = new Option(customInput.value, customInput.value);
+            select.add(customOption);
+            select.value = customInput.value;
+        }
+    }
+}
+
+function useDefaultPrompt() {
+    const defaultPrompt = `请分析以下中文文本的情感倾向，对每条文本只回答"正面"或"负面"，按顺序返回结果，用换行符分隔：
+
+{batch_texts}
+
+请按顺序返回每条文本的情感分析结果：`;
+    document.getElementById('promptTemplate').value = defaultPrompt;
+}
+
+function previewPrompt() {
+    const template = document.getElementById('promptTemplate').value;
+    const previewText = document.getElementById('previewText').value;
+    const result = template.replace('{text}', previewText);
+    
+    document.getElementById('previewResult').textContent = result;
+    
+    const modal = new bootstrap.Modal(document.getElementById('promptModal'));
+    modal.show();
+}
+
+async function loadConfig() {
+    try {
+        const response = await fetch('/api/llm-config');
+        configData = await response.json();
+        
+        // Update form with loaded config
+        document.querySelector(`input[name="api_type"][value="${configData.api_type || 'openai'}"]`).checked = true;
+        document.getElementById('baseUrl').value = configData.base_url || '';
+        document.getElementById('apiKey').value = configData.api_key || '';
+        
+        // Handle model name (including custom models)
+        const modelName = configData.model_name || 'gpt-3.5-turbo';
+        const modelSelect = document.getElementById('modelName');
+        const customModelInput = document.getElementById('customModelName');
+        
+        // Check if it's a predefined model
+        const predefinedModels = ['gpt-3.5-turbo', 'gpt-3.5-turbo-16k', 'gpt-4', 'gpt-4-turbo-preview', 'qwen-turbo', 'glm-4'];
+        if (predefinedModels.includes(modelName)) {
+            modelSelect.value = modelName;
+            customModelInput.style.display = 'none';
+        } else {
+            // Custom model
+            modelSelect.value = 'custom';
+            customModelInput.value = modelName;
+            customModelInput.style.display = 'block';
+        }
+        
+        document.getElementById('timeout').value = configData.timeout || 30;
+        document.getElementById('maxConcurrent').value = configData.max_concurrent || 5;
+        document.getElementById('batchSize').value = configData.batch_size || 5;
+        document.getElementById('temperature').value = configData.temperature || 0.1;
+        document.getElementById('maxTokens').value = configData.max_tokens || 10;
+        document.getElementById('retryCount').value = configData.retry_count || 3;
+        document.getElementById('promptTemplate').value = configData.prompt_template || '';
+        
+        // Update UI
+        updateApiTypeUI(configData.api_type || 'openai');
+        updateConcurrentBadge(configData.max_concurrent || 5);
+        updateBatchSizeBadge(configData.batch_size || 5);
+        updateTempBadge(configData.temperature || 0.1);
+        
+        // Set default prompt if empty
+        if (!configData.prompt_template) {
+            useDefaultPrompt();
+        }
+        
+    } catch (error) {
+        console.error('Failed to load config:', error);
+        showToast('加载配置失败', 'error');
+    }
+}
+
+async function saveConfig() {
+    let modelName = document.getElementById('modelName').value;
+    const customModelName = document.getElementById('customModelName').value;
+    
+    // 如果选择了自定义模型且有输入值
+    if (modelName === 'custom' && customModelName.trim()) {
+        modelName = customModelName.trim();
+    }
+    
+    const config = {
+        api_type: document.querySelector('input[name="api_type"]:checked').value,
+        base_url: document.getElementById('baseUrl').value,
+        api_key: document.getElementById('apiKey').value,
+        model_name: modelName,
+        timeout: parseInt(document.getElementById('timeout').value),
+        max_concurrent: parseInt(document.getElementById('maxConcurrent').value),
+        batch_size: parseInt(document.getElementById('batchSize').value),
+        temperature: parseFloat(document.getElementById('temperature').value),
+        max_tokens: parseInt(document.getElementById('maxTokens').value),
+        retry_count: parseInt(document.getElementById('retryCount').value),
+        prompt_template: document.getElementById('promptTemplate').value
+    };
+    
+    // Validation
+    if (!config.api_key) {
+        showToast('请输入API密钥', 'warning');
+        return;
+    }
+    
+    if (!config.model_name || config.model_name === 'custom') {
+        showToast('请输入有效的模型名称', 'warning');
+        return;
+    }
+    
+    try {
+        showLoading('保存配置中...', '正在验证配置信息');
+        
+        const response = await fetch('/api/llm-config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            configData = config;
+            showToast('配置保存成功', 'success');
+            updateConnectionStatus('saved', '配置已保存', '请测试连接以验证配置');
+        } else {
+            showToast('配置保存失败: ' + result.error, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Save config error:', error);
+        showToast('保存配置失败', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function testConnection() {
+    const config = {
+        api_type: document.querySelector('input[name="api_type"]:checked').value,
+        base_url: document.getElementById('baseUrl').value,
+        api_key: document.getElementById('apiKey').value,
+        model_name: document.getElementById('modelName').value,
+        timeout: parseInt(document.getElementById('timeout').value),
+        temperature: parseFloat(document.getElementById('temperature').value),
+        max_tokens: parseInt(document.getElementById('maxTokens').value),
+        prompt_template: document.getElementById('promptTemplate').value
+    };
+    
+    if (!config.api_key) {
+        showToast('请先输入API密钥', 'warning');
+        return;
+    }
+    
+    updateConnectionStatus('testing', '测试中...', '正在连接API服务');
+    
+    try {
+        const startTime = Date.now();
+        
+        const response = await fetch('/api/test-llm', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        const responseTime = Date.now() - startTime;
+        
+        if (result.success) {
+            updateConnectionStatus('success', '连接成功', `响应时间: ${responseTime}ms`);
+            displayTestResults(result, responseTime);
+        } else {
+            updateConnectionStatus('error', '连接失败', result.error);
+            displayTestError(result.error);
+        }
+        
+    } catch (error) {
+        console.error('Test connection error:', error);
+        updateConnectionStatus('error', '连接失败', '网络错误或服务不可用');
+        displayTestError(error.message);
+    }
+}
+
+function updateConnectionStatus(status, title, detail) {
+    const statusDot = document.querySelector('.status-dot');
+    const statusText = document.getElementById('statusText');
+    const statusDetail = document.getElementById('statusDetail');
+    
+    // Remove all status classes
+    statusDot.className = 'status-dot';
+    
+    // Add current status class
+    statusDot.classList.add(`status-${status}`);
+    
+    statusText.textContent = title;
+    statusDetail.textContent = detail;
+}
+
+function displayTestResults(result, responseTime) {
+    const container = document.getElementById('testResults');
+    
+    container.innerHTML = `
+        <div class="test-success">
+            <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                <strong>测试成功</strong>
+            </div>
+            
+            <div class="result-item mb-2">
+                <small class="text-muted">测试文本：</small>
+                <div>${result.test_text}</div>
+            </div>
+            
+            <div class="result-item mb-2">
+                <small class="text-muted">分析结果：</small>
+                <div>
+                    <span class="badge ${result.result.sentiment === 1 ? 'bg-success' : 'bg-danger'}">
+                        ${result.result.sentiment === 1 ? '正面' : '负面'}
+                    </span>
+                    <small class="text-muted ms-2">(${result.result.source})</small>
+                </div>
+            </div>
+            
+            <div class="result-item mb-2">
+                <small class="text-muted">置信度：</small>
+                <div>${(result.result.confidence * 100).toFixed(1)}%</div>
+            </div>
+            
+            <div class="result-item">
+                <small class="text-muted">响应时间：</small>
+                <div>${responseTime}ms</div>
+            </div>
+        </div>
+    `;
+}
+
+function displayTestError(error) {
+    const container = document.getElementById('testResults');
+    
+    container.innerHTML = `
+        <div class="test-error">
+            <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+                <strong>测试失败</strong>
+            </div>
+            
+            <div class="error-detail">
+                <small class="text-muted">错误信息：</small>
+                <div class="text-danger">${error}</div>
+            </div>
+            
+            <div class="mt-3">
+                <small class="text-muted">
+                    <i class="bi bi-lightbulb me-1"></i>
+                    请检查API密钥、网络连接和服务可用性
+                </small>
+            </div>
+        </div>
+    `;
+}
+
+// Update preview text when typing
+document.getElementById('previewText').addEventListener('input', function() {
+    if (document.getElementById('promptModal').classList.contains('show')) {
+        previewPrompt();
+    }
+});
+</script>
+{% endblock %} 

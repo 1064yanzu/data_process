@@ -1,0 +1,622 @@
+{% extends "base.html" %}
+
+{% block title %}数据上传 - 情感分析系统{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="glass-card text-center mb-5">
+    <h1 class="display-5 fw-bold mb-3">
+        <i class="bi bi-cloud-upload text-gradient me-3"></i>数据上传
+    </h1>
+    <p class="lead">支持CSV、TXT格式文件，批量导入文本数据进行情感分析</p>
+</div>
+
+<!-- Upload Section -->
+<div class="row g-4">
+    <!-- File Upload Area -->
+    <div class="col-lg-8">
+        <div class="glass-card">
+            <h3 class="mb-4">
+                <i class="bi bi-file-earmark-arrow-up me-2"></i>选择文件
+            </h3>
+            
+            <!-- Drag and Drop Area -->
+            <div id="dropZone" class="drop-zone mb-4">
+                <div class="drop-zone-content">
+                    <i class="bi bi-cloud-upload drop-icon mb-3"></i>
+                    <h4>拖拽文件到此处</h4>
+                    <p class="text-muted mb-4">或点击选择文件</p>
+                    <input type="file" id="fileInput" accept=".csv,.txt" class="d-none">
+                    <button type="button" class="btn btn-modern" onclick="document.getElementById('fileInput').click()">
+                        <i class="bi bi-folder2-open me-2"></i>选择文件
+                    </button>
+                </div>
+            </div>
+            
+            <!-- File Info -->
+            <div id="fileInfo" class="file-info" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 id="fileName" class="mb-1"></h5>
+                        <p class="text-muted mb-0" id="fileSize"></p>
+                    </div>
+                    <button class="btn btn-outline-danger btn-sm" onclick="clearFile()">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                
+                <!-- Upload Progress -->
+                <div id="uploadProgress" style="display: none;">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>上传进度</span>
+                        <span id="progressText">0%</span>
+                    </div>
+                    <div class="progress-modern">
+                        <div class="progress-bar-modern" id="progressBar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Upload Options -->
+            <div id="uploadOptions" style="display: none;">
+                <hr class="my-4">
+                <h5 class="mb-3">解析选项</h5>
+                
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">数据集类型</label>
+                        <select id="datasetType" class="form-select-modern">
+                            <option value="train">训练集</option>
+                            <option value="test">测试集</option>
+                            <option value="validation">验证集</option>
+                            <option value="unlabeled">无标签数据</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <label class="form-label">编码格式</label>
+                        <select id="encoding" class="form-select-modern">
+                            <option value="utf-8">UTF-8</option>
+                            <option value="gbk">GBK</option>
+                            <option value="gb2312">GB2312</option>
+                            <option value="auto">自动检测</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-4" id="csvOptions" style="display: none;">
+                        <label class="form-label">数据列选择</label>
+                        <select id="textColumn" class="form-select-modern">
+                            <option value="auto">自动检测</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button class="btn btn-modern me-3" onclick="processFile()">
+                        <i class="bi bi-play-circle me-2"></i>开始解析
+                    </button>
+                    <button class="btn btn-outline-light" onclick="previewFile()">
+                        <i class="bi bi-eye me-2"></i>预览数据
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Upload Stats -->
+    <div class="col-lg-4">
+        <div class="glass-card glass-card-sm">
+            <h5 class="mb-3">
+                <i class="bi bi-info-circle me-2"></i>上传说明
+            </h5>
+            
+            <div class="upload-stats">
+                <div class="stat-item-sm mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>支持格式</span>
+                        <span class="text-success">CSV, TXT</span>
+                    </div>
+                </div>
+                
+                <div class="stat-item-sm mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>编码支持</span>
+                        <span class="text-info">多种编码</span>
+                    </div>
+                </div>
+                
+                <div class="stat-item-sm mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>数据集类型</span>
+                        <span class="text-warning">训练/测试</span>
+                    </div>
+                </div>
+            </div>
+            
+            <hr class="my-3">
+            
+            <h6 class="mb-3">格式要求</h6>
+            <ul class="list-unstyled small text-muted">
+                <li class="mb-2">
+                    <i class="bi bi-check-circle text-success me-2"></i>
+                    CSV文件需包含文本列
+                </li>
+                <li class="mb-2">
+                    <i class="bi bi-check-circle text-success me-2"></i>
+                    TXT文件每行一条文本
+                </li>
+                <li class="mb-2">
+                    <i class="bi bi-check-circle text-success me-2"></i>
+                    支持中文编码（UTF-8/GBK）
+                </li>
+                <li class="mb-2">
+                    <i class="bi bi-check-circle text-success me-2"></i>
+                    可选择数据集用途
+                </li>
+            </ul>
+        </div>
+        
+        <!-- Recent Uploads -->
+        <div class="glass-card glass-card-sm mt-4">
+            <h5 class="mb-3">
+                <i class="bi bi-clock-history me-2"></i>最近上传
+            </h5>
+            
+            <div id="recentUploads">
+                <div class="text-center text-muted">
+                    <i class="bi bi-inbox" style="font-size: 2rem; opacity: 0.5;"></i>
+                    <p class="mt-2 mb-0">暂无上传记录</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">
+                    <i class="bi bi-eye me-2"></i>数据预览
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent">
+                    <!-- Preview content will be inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-modern" onclick="confirmUpload()">
+                    <i class="bi bi-check-circle me-2"></i>确认上传
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.drop-zone {
+    border: 3px dashed var(--glass-border);
+    border-radius: 20px;
+    padding: 3rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+    transform: scale(1.02);
+}
+
+.drop-icon {
+    font-size: 4rem;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+}
+
+.drop-zone:hover .drop-icon {
+    color: #667eea;
+    transform: scale(1.1);
+}
+
+.file-info {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 1.5rem;
+    backdrop-filter: blur(10px);
+}
+
+.upload-stats {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.stat-item-sm {
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    backdrop-filter: blur(5px);
+}
+
+.upload-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+}
+
+.upload-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(5px);
+}
+
+.preview-table {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .drop-zone {
+        padding: 2rem 1rem;
+    }
+    
+    .drop-icon {
+        font-size: 3rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFile = null;
+let parsedData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeUpload();
+    loadRecentUploads();
+});
+
+function initializeUpload() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    
+    // Drag and drop handlers
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+}
+
+function handleFile(file) {
+    // Validate file type
+    const allowedTypes = ['.csv', '.txt'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    if (!allowedTypes.includes(fileExtension)) {
+        showToast('不支持的文件格式，请选择CSV或TXT文件', 'error');
+        return;
+    }
+    
+    // Validate file size (16MB)
+    if (file.size > 16 * 1024 * 1024) {
+        showToast('文件大小不能超过16MB', 'error');
+        return;
+    }
+    
+    currentFile = file;
+    
+    // Update UI
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = formatFileSize(file.size);
+    document.getElementById('fileInfo').style.display = 'block';
+    document.getElementById('uploadOptions').style.display = 'block';
+    
+    // Show CSV options if CSV file
+    if (fileExtension === '.csv') {
+        document.getElementById('csvOptions').style.display = 'block';
+        loadCSVColumns();
+    } else {
+        document.getElementById('csvOptions').style.display = 'none';
+    }
+}
+
+function clearFile() {
+    currentFile = null;
+    parsedData = null;
+    
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileInfo').style.display = 'none';
+    document.getElementById('uploadOptions').style.display = 'none';
+    document.getElementById('uploadProgress').style.display = 'none';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+async function loadCSVColumns() {
+    if (!currentFile || !currentFile.name.endsWith('.csv')) return;
+    
+    try {
+        const text = await readFileAsText(currentFile);
+        const lines = text.split('\n');
+        
+        if (lines.length > 0) {
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            const select = document.getElementById('textColumn');
+            
+            // Clear existing options except auto
+            select.innerHTML = '<option value="auto">自动检测</option>';
+            
+            // Add column options
+            headers.forEach((header, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `列 ${index + 1}: ${header}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load CSV columns:', error);
+    }
+}
+
+function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsText(file, document.getElementById('encoding').value);
+    });
+}
+
+async function processFile() {
+    if (!currentFile) {
+        showToast('请先选择文件', 'warning');
+        return;
+    }
+    
+    showLoading('解析文件中...', '正在读取文件内容');
+    
+    try {
+        // Show progress
+        document.getElementById('uploadProgress').style.display = 'block';
+        updateProgress(20, '读取文件中...');
+        
+        // Create FormData and upload
+        const formData = new FormData();
+        formData.append('file', currentFile);
+        formData.append('dataset_type', document.getElementById('datasetType').value);
+        formData.append('encoding', document.getElementById('encoding').value);
+        
+        const textColumn = document.getElementById('textColumn').value;
+        if (textColumn !== 'auto') {
+            formData.append('text_column', textColumn);
+        }
+        
+        updateProgress(50, '上传文件中...');
+        
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        updateProgress(80, '解析数据中...');
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            parsedData = result;
+            updateProgress(100, '解析完成');
+            
+            const datasetTypeText = {
+                'train': '训练集',
+                'test': '测试集', 
+                'validation': '验证集',
+                'unlabeled': '无标签数据'
+            }[result.dataset_type] || '未知类型';
+            
+            showToast(`成功解析 ${result.count} 条${datasetTypeText}数据`, 'success');
+            
+            // Add to recent uploads
+            addToRecentUploads({
+                name: currentFile.name,
+                count: result.count,
+                type: datasetTypeText,
+                encoding: result.encoding_used,
+                time: new Date().toLocaleString()
+            });
+            
+            setTimeout(() => {
+                hideLoading();
+                // Auto redirect to process page with data
+                sessionStorage.setItem('uploadedData', JSON.stringify(result.texts));
+                sessionStorage.setItem('datasetType', result.dataset_type);
+                window.location.href = '/process';
+            }, 1000);
+            
+        } else {
+            throw new Error(result.error || '文件处理失败');
+        }
+        
+    } catch (error) {
+        console.error('File processing error:', error);
+        showToast('文件处理失败: ' + error.message, 'error');
+        hideLoading();
+    }
+}
+
+async function previewFile() {
+    if (!currentFile) {
+        showToast('请先选择文件', 'warning');
+        return;
+    }
+    
+    try {
+        showLoading('生成预览...', '正在读取文件内容');
+        
+        const text = await readFileAsText(currentFile);
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        let previewHtml = '';
+        
+        if (currentFile.name.endsWith('.csv')) {
+            // CSV preview
+            const maxRows = Math.min(20, lines.length);
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            
+            previewHtml = '<div class="table-responsive preview-table">';
+            previewHtml += '<table class="table table-modern table-sm">';
+            previewHtml += '<thead><tr>';
+            headers.forEach(header => {
+                previewHtml += `<th>${header}</th>`;
+            });
+            previewHtml += '</tr></thead><tbody>';
+            
+            for (let i = 1; i < maxRows; i++) {
+                const cells = lines[i].split(',');
+                previewHtml += '<tr>';
+                cells.forEach(cell => {
+                    previewHtml += `<td class="text-truncate" style="max-width: 200px;" title="${cell.trim().replace(/"/g, '')}">${cell.trim().replace(/"/g, '')}</td>`;
+                });
+                previewHtml += '</tr>';
+            }
+            
+            previewHtml += '</tbody></table></div>';
+            
+        } else {
+            // TXT preview
+            const maxLines = Math.min(30, lines.length);
+            previewHtml = '<div class="preview-content">';
+            
+            for (let i = 0; i < maxLines; i++) {
+                previewHtml += `<div class="mb-2 p-2 bg-light bg-opacity-10 rounded">
+                    <small class="text-muted">第${i+1}行:</small>
+                    <div>${lines[i]}</div>
+                </div>`;
+            }
+            
+            previewHtml += '</div>';
+        }
+        
+        if (lines.length > (currentFile.name.endsWith('.csv') ? 20 : 30)) {
+            previewHtml += `<div class="text-center mt-3">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    还有 ${lines.length - (currentFile.name.endsWith('.csv') ? 20 : 30)} 行数据...
+                </small>
+            </div>`;
+        }
+        
+        document.getElementById('previewContent').innerHTML = previewHtml;
+        
+        hideLoading();
+        
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Preview error:', error);
+        showToast('预览失败: ' + error.message, 'error');
+        hideLoading();
+    }
+}
+
+function confirmUpload() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('previewModal'));
+    modal.hide();
+    processFile();
+}
+
+function updateProgress(percent, text) {
+    document.getElementById('progressBar').style.width = percent + '%';
+    document.getElementById('progressText').textContent = percent + '%';
+    
+    if (text) {
+        document.getElementById('loadingSubtext').textContent = text;
+    }
+}
+
+function addToRecentUploads(upload) {
+    let recentUploads = JSON.parse(localStorage.getItem('recentUploads') || '[]');
+    recentUploads.unshift(upload);
+    recentUploads = recentUploads.slice(0, 5); // Keep only 5 recent uploads
+    localStorage.setItem('recentUploads', JSON.stringify(recentUploads));
+    displayRecentUploads(recentUploads);
+}
+
+function loadRecentUploads() {
+    const recentUploads = JSON.parse(localStorage.getItem('recentUploads') || '[]');
+    displayRecentUploads(recentUploads);
+}
+
+function displayRecentUploads(uploads) {
+    const container = document.getElementById('recentUploads');
+    
+    if (uploads.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="bi bi-inbox" style="font-size: 2rem; opacity: 0.5;"></i>
+                <p class="mt-2 mb-0">暂无上传记录</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = uploads.map(upload => `
+        <div class="upload-item">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <h6 class="mb-1">${upload.name}</h6>
+                    <div class="d-flex gap-2 mb-1">
+                        <small class="badge bg-info">${upload.count} 条</small>
+                        <small class="badge bg-secondary">${upload.type || '数据'}</small>
+                        ${upload.encoding ? `<small class="badge bg-success">${upload.encoding}</small>` : ''}
+                    </div>
+                </div>
+                <div class="text-end">
+                    <small class="text-muted">${upload.time}</small>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,971 @@
+{% extends "base.html" %}
+
+{% block title %}数据处理 - 情感分析系统{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="glass-card text-center mb-5">
+    <h1 class="display-5 fw-bold mb-3">
+        <i class="bi bi-cpu text-gradient me-3"></i>批量处理
+    </h1>
+    <p class="lead">LLM智能分析配合人工复核，确保数据质量</p>
+</div>
+
+<div class="row g-4">
+    <!-- Processing Configuration -->
+    <div class="col-lg-8">
+        <div class="glass-card">
+            <!-- Data Overview -->
+            <div class="mb-4">
+                <h4 class="mb-3">
+                    <i class="bi bi-database me-2"></i>数据概览
+                </h4>
+                
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="data-stat">
+                            <div class="stat-number" id="totalCount">0</div>
+                            <div class="stat-label">总数据量</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="data-stat">
+                            <div class="stat-number text-info" id="processedCount">0</div>
+                            <div class="stat-label">已处理</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="data-stat">
+                            <div class="stat-number text-warning" id="pendingCount">0</div>
+                            <div class="stat-label">待处理</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="data-stat">
+                            <div class="stat-number text-danger" id="needsReviewCount">0</div>
+                            <div class="stat-label">需复核</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Configuration -->
+            <div class="mb-4">
+                <h4 class="mb-3">
+                    <i class="bi bi-sliders me-2"></i>处理配置
+                </h4>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="reviewRatio" class="form-label">
+                            人工复核比例
+                            <span class="badge bg-info ms-2" id="reviewRatioBadge">20%</span>
+                        </label>
+                        <input type="range" id="reviewRatio" class="form-range" 
+                               min="0" max="100" value="20" step="5" 
+                               oninput="updateReviewRatioBadge(this.value)">
+                        <div class="d-flex justify-content-between text-muted small">
+                            <span>全自动</span>
+                            <span>全人工</span>
+                        </div>
+                        <div class="form-text text-muted mt-2">
+                            <i class="bi bi-info-circle me-1"></i>
+                            随机抽取指定比例的数据进行人工复核
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="batchSize" class="form-label">批处理大小</label>
+                        <select id="batchSize" class="form-select-modern">
+                            <option value="10">10条/批</option>
+                            <option value="20" selected>20条/批</option>
+                            <option value="50">50条/批</option>
+                            <option value="100">100条/批</option>
+                        </select>
+                        <div class="form-text text-muted">
+                            根据数据量和API限制选择合适的批次大小
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="priorityMode" class="form-label">处理优先级</label>
+                        <select id="priorityMode" class="form-select-modern">
+                            <option value="sequential">顺序处理</option>
+                            <option value="confidence">低置信度优先</option>
+                            <option value="length">短文本优先</option>
+                            <option value="random">随机处理</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="confidenceThreshold" class="form-label">
+                            低置信度阈值
+                            <span class="badge bg-warning ms-2" id="confidenceBadge">0.7</span>
+                        </label>
+                        <input type="range" id="confidenceThreshold" class="form-range" 
+                               min="0.5" max="0.9" value="0.7" step="0.05" 
+                               oninput="updateConfidenceBadge(this.value)">
+                        <div class="form-text text-muted">
+                            低于该阈值的预测将自动标记为需要复核
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Controls -->
+            <div class="mb-4">
+                <h4 class="mb-3">
+                    <i class="bi bi-play-circle me-2"></i>处理控制
+                </h4>
+                
+                <div class="d-flex gap-3 align-items-center flex-wrap">
+                    <button id="startBtn" class="btn btn-modern" onclick="startProcessing()">
+                        <i class="bi bi-play-fill me-2"></i>开始处理
+                    </button>
+                    <button id="pauseBtn" class="btn btn-warning-modern" onclick="pauseProcessing()" disabled>
+                        <i class="bi bi-pause-fill me-2"></i>暂停处理
+                    </button>
+                    <button id="stopBtn" class="btn btn-danger-modern" onclick="stopProcessing()" disabled>
+                        <i class="bi bi-stop-fill me-2"></i>停止处理
+                    </button>
+                    <button class="btn btn-outline-light" onclick="exportResults()">
+                        <i class="bi bi-download me-2"></i>导出结果
+                    </button>
+                </div>
+            </div>
+
+            <!-- Processing Progress -->
+            <div id="progressSection" style="display: none;">
+                <h4 class="mb-3">
+                    <i class="bi bi-activity me-2"></i>处理进度
+                </h4>
+                
+                <div class="progress-container">
+                    <div class="progress-header">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>总体进度</span>
+                            <span id="overallProgress">0%</span>
+                        </div>
+                        <div class="progress-modern">
+                            <div class="progress-bar-modern" id="overallProgressBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-4">
+                            <div class="progress-item">
+                                <div class="progress-label">LLM分析</div>
+                                <div class="progress-value" id="llmProgress">0%</div>
+                                <div class="progress-bar-sm">
+                                    <div class="progress-fill" id="llmProgressBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="progress-item">
+                                <div class="progress-label">待复核</div>
+                                <div class="progress-value" id="reviewProgress">0%</div>
+                                <div class="progress-bar-sm">
+                                    <div class="progress-fill bg-warning" id="reviewProgressBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="progress-item">
+                                <div class="progress-label">已完成</div>
+                                <div class="progress-value" id="completedProgress">0%</div>
+                                <div class="progress-bar-sm">
+                                    <div class="progress-fill bg-success" id="completedProgressBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Status -->
+            <div id="statusSection" style="display: none;">
+                <h4 class="mb-3">
+                    <i class="bi bi-info-circle me-2"></i>实时状态
+                </h4>
+                
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">当前状态</div>
+                        <div class="status-value" id="currentStatus">准备中</div>
+                    </div>
+                    
+                    <div class="status-item">
+                        <div class="status-label">处理速度</div>
+                        <div class="status-value" id="processingSpeed">0 条/分钟</div>
+                    </div>
+                    
+                    <div class="status-item">
+                        <div class="status-label">预计完成</div>
+                        <div class="status-value" id="estimatedTime">-</div>
+                    </div>
+                    
+                    <div class="status-item">
+                        <div class="status-label">错误数量</div>
+                        <div class="status-value text-danger" id="errorCount">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Processing Monitor -->
+    <div class="col-lg-4">
+        <!-- Current Batch -->
+        <div class="glass-card glass-card-sm mb-4">
+            <h5 class="mb-3">
+                <i class="bi bi-layers me-2"></i>当前批次
+            </h5>
+            
+            <div id="currentBatch">
+                <div class="text-center text-muted">
+                    <i class="bi bi-hourglass-split" style="font-size: 2rem; opacity: 0.5;"></i>
+                    <p class="mt-2 mb-0">等待开始</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Processing Log -->
+        <div class="glass-card glass-card-sm mb-4">
+            <h5 class="mb-3">
+                <i class="bi bi-list-ul me-2"></i>处理日志
+            </h5>
+            
+            <div id="processingLog" class="log-container">
+                <div class="log-entry">
+                    <small class="text-muted">[系统] 等待开始处理...</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quality Metrics -->
+        <div class="glass-card glass-card-sm">
+            <h5 class="mb-3">
+                <i class="bi bi-graph-up me-2"></i>质量指标
+            </h5>
+            
+            <div class="metrics-list">
+                <div class="metric-item">
+                    <div class="d-flex justify-content-between">
+                        <span>平均置信度</span>
+                        <span id="avgConfidence">-</span>
+                    </div>
+                </div>
+                
+                <div class="metric-item">
+                    <div class="d-flex justify-content-between">
+                        <span>正面情感比例</span>
+                        <span id="positiveRatio">-</span>
+                    </div>
+                </div>
+                
+                <div class="metric-item">
+                    <div class="d-flex justify-content-between">
+                        <span>自动标记准确率</span>
+                        <span id="autoAccuracy">-</span>
+                    </div>
+                </div>
+                
+                <div class="metric-item">
+                    <div class="d-flex justify-content-between">
+                        <span>复核发现错误率</span>
+                        <span id="reviewErrorRate">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Data Modal -->
+<div class="modal fade" id="dataModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content glass-card border-0">
+            <div class="modal-header border-0">
+                <h5 class="modal-title">
+                    <i class="bi bi-table me-2"></i>数据预览
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="dataPreview">
+                    <!-- Data table will be inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.data-stat {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    transition: all 0.3s ease;
+}
+
+.data-stat:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+}
+
+.progress-container {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 15px;
+    padding: 1.5rem;
+    backdrop-filter: blur(10px);
+}
+
+.progress-header {
+    margin-bottom: 1rem;
+}
+
+.progress-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+    backdrop-filter: blur(5px);
+}
+
+.progress-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.progress-value {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar-sm {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary-gradient);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.status-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 1rem;
+    backdrop-filter: blur(5px);
+}
+
+.status-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.status-value {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.log-container {
+    max-height: 250px;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.log-entry {
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.log-entry.success {
+    color: #28a745;
+}
+
+.log-entry.warning {
+    color: #ffc107;
+}
+
+.log-entry.error {
+    color: #dc3545;
+}
+
+.metrics-list {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.metric-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.metric-item:last-child {
+    border-bottom: none;
+}
+
+.batch-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    backdrop-filter: blur(5px);
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.batch-item.processing {
+    border-left-color: #ffc107;
+    background: rgba(255, 193, 7, 0.1);
+}
+
+.batch-item.completed {
+    border-left-color: #28a745;
+    background: rgba(40, 167, 69, 0.1);
+}
+
+.batch-item.error {
+    border-left-color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+}
+
+@media (max-width: 768px) {
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .data-stat {
+        padding: 1rem;
+    }
+    
+    .progress-container {
+        padding: 1rem;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.processing {
+    animation: pulse 2s infinite;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let processingData = [];
+let batches = [];
+let isProcessing = false;
+let processingConfig = {};
+let currentBatchIndex = 0;
+let processedCount = 0;
+let errorCount = 0;
+let startTime = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadUploadedData();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Load data from session storage if available
+    const uploadedData = sessionStorage.getItem('uploadedData');
+    if (uploadedData) {
+        processingData = JSON.parse(uploadedData);
+        updateDataOverview();
+    }
+}
+
+function updateReviewRatioBadge(value) {
+    document.getElementById('reviewRatioBadge').textContent = value + '%';
+}
+
+function updateConfidenceBadge(value) {
+    document.getElementById('confidenceBadge').textContent = value;
+}
+
+function loadUploadedData() {
+    const uploadedData = sessionStorage.getItem('uploadedData');
+    if (uploadedData) {
+        processingData = JSON.parse(uploadedData);
+        updateDataOverview();
+        addLogEntry('success', `已加载 ${processingData.length} 条数据，准备处理`);
+    } else {
+        addLogEntry('warning', '未检测到上传的数据，请先上传文件');
+    }
+}
+
+function updateDataOverview() {
+    const total = processingData.length;
+    const processed = processingData.filter(item => item.processed).length;
+    const pending = total - processed;
+    const needsReview = processingData.filter(item => item.needs_review).length;
+    
+    document.getElementById('totalCount').textContent = total;
+    document.getElementById('processedCount').textContent = processed;
+    document.getElementById('pendingCount').textContent = pending;
+    document.getElementById('needsReviewCount').textContent = needsReview;
+}
+
+async function startProcessing() {
+    if (processingData.length === 0) {
+        showToast('没有数据需要处理', 'warning');
+        return;
+    }
+    
+    // Get configuration
+    processingConfig = {
+        reviewRatio: parseInt(document.getElementById('reviewRatio').value),
+        batchSize: parseInt(document.getElementById('batchSize').value),
+        priorityMode: document.getElementById('priorityMode').value,
+        confidenceThreshold: parseFloat(document.getElementById('confidenceThreshold').value)
+    };
+    
+    // Check LLM configuration
+    try {
+        const configResponse = await fetch('/api/llm-config');
+        const llmConfig = await configResponse.json();
+        
+        if (!llmConfig.api_key) {
+            showToast('请先配置LLM API', 'error');
+            return;
+        }
+    } catch (error) {
+        showToast('无法连接到LLM服务', 'error');
+        return;
+    }
+    
+    isProcessing = true;
+    startTime = Date.now();
+    processedCount = 0;
+    errorCount = 0;
+    currentBatchIndex = 0;
+    
+    // 将数据分批处理
+    batches = [];
+    const batchSize = processingConfig.batchSize;
+    for (let i = 0; i < processingData.length; i += batchSize) {
+        const batch = processingData.slice(i, i + batchSize);
+        batches.push(batch);
+    }
+    
+    addLogEntry('info', `数据已分为 ${batches.length} 个批次，每批 ${batchSize} 条`);
+    
+    // Update UI
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('pauseBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = false;
+    
+    document.getElementById('progressSection').style.display = 'block';
+    document.getElementById('statusSection').style.display = 'block';
+    
+    updateStatus('正在处理中');
+    addLogEntry('success', '开始批量处理');
+    
+    // Start processing
+    await processNextBatch();
+}
+
+function pauseProcessing() {
+    isProcessing = false;
+    updateStatus('已暂停');
+    addLogEntry('warning', '处理已暂停');
+    
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('startBtn').innerHTML = '<i class="bi bi-play-fill me-2"></i>继续处理';
+}
+
+function stopProcessing() {
+    isProcessing = false;
+    updateStatus('已停止');
+    addLogEntry('error', '处理已停止');
+    
+    // Reset UI
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('startBtn').innerHTML = '<i class="bi bi-play-fill me-2"></i>开始处理';
+    
+    // Reset progress
+    document.getElementById('progressSection').style.display = 'none';
+    document.getElementById('statusSection').style.display = 'none';
+}
+
+async function processNextBatch() {
+    if (currentBatchIndex >= batches.length) {
+        completeProcessing();
+        return;
+    }
+    
+    const batch = batches[currentBatchIndex];
+    updateCurrentBatch(batch);
+    updateStatus(`正在处理第 ${currentBatchIndex + 1} 批`);
+    
+    addLogEntry('info', `开始处理第 ${currentBatchIndex + 1} 批，共 ${batch.length} 条数据`);
+    
+    try {
+        // 调用批量处理API
+        const response = await fetch('/api/process-batch', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                texts: batch.map(item => item.text || item), // 提取文本内容
+                review_ratio: processingConfig.reviewRatio / 100
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const taskId = result.task_id;
+            addLogEntry('info', `获得任务ID: ${taskId}，开始监控处理进度`);
+            
+            // 监控任务状态
+            await monitorTask(taskId, batch);
+            
+        } else {
+            throw new Error(result.error || '批处理失败');
+        }
+        
+    } catch (error) {
+        console.error('Batch processing error:', error);
+        addLogEntry('error', `第 ${currentBatchIndex + 1} 批处理失败: ${error.message}`);
+        errorCount++;
+        
+        // 标记批次为已处理但有错误
+        batch.forEach(item => {
+            item.llm_prediction = 0;  // 默认负面
+            item.llm_confidence = 0.5;
+            item.snownlp_prediction = 0;
+            item.snownlp_confidence = 0.5;
+            item.needs_review = true;
+            item.error = error.message;
+            processedCount++;
+        });
+        
+        // 更新进度并继续下一批
+        updateProgress();
+        updateDataOverview();
+        updateMetrics();
+        
+        currentBatchIndex++;
+        
+        if (isProcessing) {
+            setTimeout(() => processNextBatch(), 1000);
+        }
+    }
+}
+
+async function monitorTask(taskId, batch) {
+    return new Promise((resolve, reject) => {
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`/api/task-status/${taskId}`);
+                const status = await response.json();
+                
+                if (status.status === 'completed') {
+                    // 处理成功完成
+                    addLogEntry('success', `第 ${currentBatchIndex + 1} 批处理完成，共 ${status.results.length} 条结果`);
+                    
+                    // 将结果映射到原始数据
+                    for (let i = 0; i < Math.min(batch.length, status.results.length); i++) {
+                        const item = batch[i];
+                        const result = status.results[i];
+                        
+                        item.llm_prediction = result.llm_prediction;
+                        item.llm_confidence = result.llm_confidence;
+                        item.llm_source = result.llm_source;
+                        item.snownlp_prediction = result.snownlp_prediction;
+                        item.snownlp_confidence = result.snownlp_confidence;
+                        item.needs_review = result.needs_review;
+                        item.timestamp = result.timestamp;
+                        
+                        processedCount++;
+                    }
+                    
+                    // 更新界面
+                    updateProgress();
+                    updateDataOverview();
+                    updateMetrics();
+                    
+                    currentBatchIndex++;
+                    
+                    // 继续下一批
+                    if (isProcessing) {
+                        setTimeout(() => processNextBatch(), 1000);
+                    }
+                    
+                    resolve();
+                    
+                } else if (status.status === 'failed') {
+                    // 处理失败
+                    addLogEntry('error', `第 ${currentBatchIndex + 1} 批处理失败: ${status.error || '未知错误'}`);
+                    errorCount++;
+                    
+                    // 标记批次为失败
+                    batch.forEach(item => {
+                        item.llm_prediction = 0;
+                        item.llm_confidence = 0.5;
+                        item.snownlp_prediction = 0;
+                        item.snownlp_confidence = 0.5;
+                        item.needs_review = true;
+                        item.error = status.error;
+                        processedCount++;
+                    });
+                    
+                    updateProgress();
+                    updateDataOverview();
+                    updateMetrics();
+                    
+                    currentBatchIndex++;
+                    
+                    if (isProcessing) {
+                        setTimeout(() => processNextBatch(), 1000);
+                    }
+                    
+                    resolve();
+                    
+                } else if (status.status === 'processing') {
+                    // 仍在处理中
+                    const progress = status.progress || 0;
+                    addLogEntry('info', `第 ${currentBatchIndex + 1} 批处理进度: ${progress.toFixed(1)}%`);
+                    
+                    // 继续检查状态
+                    setTimeout(checkStatus, 2000);
+                    
+                } else {
+                    // 其他状态，继续等待
+                    setTimeout(checkStatus, 2000);
+                }
+                
+            } catch (error) {
+                console.error('监控任务状态失败:', error);
+                addLogEntry('error', `监控任务状态失败: ${error.message}`);
+                reject(error);
+            }
+        };
+        
+        // 开始检查状态
+        checkStatus();
+    });
+}
+
+function completeProcessing() {
+    isProcessing = false;
+    updateStatus('处理完成');
+    addLogEntry('success', '所有数据处理完成');
+    
+    // Update UI
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('startBtn').innerHTML = '<i class="bi bi-play-fill me-2"></i>开始处理';
+    
+    // Save results
+    sessionStorage.setItem('processedData', JSON.stringify(processingData));
+    
+    showToast('数据处理完成，可以进行复核或训练', 'success');
+}
+
+function updateProgress() {
+    const total = processingData.length;
+    const processed = processedCount;
+    const overallPercent = Math.round((processed / total) * 100);
+    
+    document.getElementById('overallProgress').textContent = overallPercent + '%';
+    document.getElementById('overallProgressBar').style.width = overallPercent + '%';
+    
+    // Update sub-progress
+    const llmProcessed = processingData.filter(item => item.llm_prediction !== undefined && !item.error).length;
+    const needsReview = processingData.filter(item => item.needs_review).length;
+    const completed = processingData.filter(item => item.llm_prediction !== undefined && !item.needs_review).length;
+    
+    const llmPercent = Math.round((llmProcessed / total) * 100);
+    const reviewPercent = Math.round((needsReview / total) * 100);
+    const completedPercent = Math.round((completed / total) * 100);
+    
+    document.getElementById('llmProgress').textContent = llmPercent + '%';
+    document.getElementById('llmProgressBar').style.width = llmPercent + '%';
+    
+    document.getElementById('reviewProgress').textContent = reviewPercent + '%';
+    document.getElementById('reviewProgressBar').style.width = reviewPercent + '%';
+    
+    document.getElementById('completedProgress').textContent = completedPercent + '%';
+    document.getElementById('completedProgressBar').style.width = completedPercent + '%';
+}
+
+function updateStatus(status) {
+    document.getElementById('currentStatus').textContent = status;
+    
+    // Calculate processing speed
+    if (startTime && processedCount > 0) {
+        const elapsed = (Date.now() - startTime) / 1000 / 60; // minutes
+        const speed = Math.round(processedCount / elapsed);
+        document.getElementById('processingSpeed').textContent = speed + ' 条/分钟';
+        
+        // Estimate completion time
+        const remaining = processingData.length - processedCount;
+        if (speed > 0) {
+            const estimatedMinutes = Math.round(remaining / speed);
+            document.getElementById('estimatedTime').textContent = estimatedMinutes + ' 分钟';
+        }
+    }
+    
+    document.getElementById('errorCount').textContent = errorCount;
+}
+
+function updateCurrentBatch(batch) {
+    const container = document.getElementById('currentBatch');
+    
+    if (batch.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="bi bi-check-circle" style="font-size: 2rem; opacity: 0.5;"></i>
+                <p class="mt-2 mb-0">所有批次已完成</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="mb-3">
+            <strong>第 ${currentBatchIndex + 1} 批</strong>
+            <span class="badge bg-info ms-2">${batch.length} 条</span>
+        </div>
+        ${batch.slice(0, 3).map((item, index) => `
+            <div class="batch-item processing">
+                <div class="small text-muted">#${index + 1}</div>
+                <div class="text-truncate">${item.text}</div>
+            </div>
+        `).join('')}
+        ${batch.length > 3 ? `<div class="text-center text-muted"><small>还有 ${batch.length - 3} 条...</small></div>` : ''}
+    `;
+}
+
+function updateMetrics() {
+    const processed = processingData.filter(item => item.llm_prediction !== undefined && !item.error);
+    
+    if (processed.length === 0) return;
+    
+    // Average confidence
+    const avgConfidence = processed.reduce((sum, item) => sum + (item.llm_confidence || 0), 0) / processed.length;
+    document.getElementById('avgConfidence').textContent = (avgConfidence * 100).toFixed(1) + '%';
+    
+    // Positive ratio
+    const positive = processed.filter(item => item.llm_prediction === 1).length;
+    const positiveRatio = (positive / processed.length) * 100;
+    document.getElementById('positiveRatio').textContent = positiveRatio.toFixed(1) + '%';
+    
+    // Auto accuracy (placeholder - would need ground truth)
+    document.getElementById('autoAccuracy').textContent = '估算中...';
+    
+    // Review error rate
+    const needsReview = processed.filter(item => item.needs_review).length;
+    const reviewErrorRate = (needsReview / processed.length) * 100;
+    document.getElementById('reviewErrorRate').textContent = reviewErrorRate.toFixed(1) + '%';
+}
+
+function addLogEntry(type, message) {
+    const container = document.getElementById('processingLog');
+    const time = new Date().toLocaleTimeString();
+    
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.innerHTML = `<small class="text-muted">[${time}]</small> ${message}`;
+    
+    container.appendChild(entry);
+    container.scrollTop = container.scrollHeight;
+    
+    // Keep only last 50 entries
+    while (container.children.length > 50) {
+        container.removeChild(container.firstChild);
+    }
+}
+
+async function exportResults() {
+    if (processingData.length === 0) {
+        showToast('没有数据可以导出', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/export-results', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                data: processingData,
+                format: 'csv'
+            })
+        });
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `sentiment_results_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showToast('结果导出成功', 'success');
+        } else {
+            throw new Error('导出失败');
+        }
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        showToast('导出失败: ' + error.message, 'error');
+    }
+}
+
+// Auto-update metrics every 5 seconds during processing
+setInterval(() => {
+    if (isProcessing) {
+        updateMetrics();
+    }
+}, 5000);
+</script>
+{% endblock %} 

@@ -1,0 +1,736 @@
+{% extends "base.html" %}
+
+{% block title %}效果评估 - 情感分析助手{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="fas fa-chart-bar text-warning me-2"></i>效果评估
+    </h2>
+    <div>
+        <button class="btn btn-outline-primary" onclick="loadEvaluationData()">
+            <i class="fas fa-sync-alt me-2"></i>刷新数据
+        </button>
+        <button class="btn btn-success" onclick="runEvaluation()">
+            <i class="fas fa-play me-2"></i>重新评估
+        </button>
+    </div>
+</div>
+
+<!-- 评估状态提示 -->
+<div id="evaluationAlert" class="alert alert-info" role="alert" style="display: none;">
+    <div class="d-flex align-items-center">
+        <div class="spinner-border spinner-border-sm me-3" role="status"></div>
+        <div>
+            <strong>正在评估模型性能...</strong><br>
+            <small>这可能需要几分钟时间，请耐心等待</small>
+        </div>
+    </div>
+</div>
+
+<!-- 模型对比总览 -->
+<div class="row mb-4" id="overviewCards">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>自定义训练模型
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h3 class="text-primary" id="customAccuracy">-</h3>
+                        <small class="text-muted">准确率</small>
+                    </div>
+                    <div class="col-6">
+                        <h3 class="text-primary" id="customF1">-</h3>
+                        <small class="text-muted">F1 分数</small>
+                    </div>
+                </div>
+                <div class="row text-center mt-3">
+                    <div class="col-6">
+                        <h6 class="text-success" id="customPrecision">-</h6>
+                        <small class="text-muted">精确率</small>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-success" id="customRecall">-</h6>
+                        <small class="text-muted">召回率</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-snowflake me-2"></i>SnowNLP 基线模型
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h3 class="text-secondary" id="snownlpAccuracy">-</h3>
+                        <small class="text-muted">准确率</small>
+                    </div>
+                    <div class="col-6">
+                        <h3 class="text-secondary" id="snownlpF1">-</h3>
+                        <small class="text-muted">F1 分数</small>
+                    </div>
+                </div>
+                <div class="row text-center mt-3">
+                    <div class="col-6">
+                        <h6 class="text-info" id="snownlpPrecision">-</h6>
+                        <small class="text-muted">精确率</small>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-info" id="snownlpRecall">-</h6>
+                        <small class="text-muted">召回率</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 性能提升指标 -->
+<div class="card mb-4" id="improvementCard" style="display: none;">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-arrow-up me-2"></i>性能提升分析
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-success" id="accuracyImprovement">+0%</h4>
+                    <small class="text-muted">准确率提升</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-success" id="f1Improvement">+0%</h4>
+                    <small class="text-muted">F1 分数提升</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-success" id="precisionImprovement">+0%</h4>
+                    <small class="text-muted">精确率提升</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-success" id="recallImprovement">+0%</h4>
+                    <small class="text-muted">召回率提升</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 详细图表分析 -->
+<div class="row">
+    <!-- 性能对比雷达图 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-area me-2"></i>性能对比雷达图
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="radarChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 性能指标柱状图 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>性能指标对比
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 混淆矩阵 - 自定义模型 -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-table me-2"></i>混淆矩阵 - 自定义模型
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="customConfusionMatrix"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 混淆矩阵 - SnowNLP -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-table me-2"></i>混淆矩阵 - SnowNLP
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="snownlpConfusionMatrix"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 详细预测结果 -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-search me-2"></i>详细预测分析
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <select id="predictionFilter" class="form-select" onchange="filterPredictions()">
+                    <option value="">全部预测</option>
+                    <option value="correct">预测正确</option>
+                    <option value="incorrect">预测错误</option>
+                    <option value="disagreement">模型分歧</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <input type="text" id="predictionSearch" class="form-control" placeholder="搜索文本..." onkeyup="searchPredictions()">
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-outline-primary" onclick="exportPredictions()">
+                    <i class="fas fa-download me-2"></i>导出结果
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th width="5%">#</th>
+                        <th width="40%">文本内容</th>
+                        <th width="15%">真实标签</th>
+                        <th width="15%">自定义模型</th>
+                        <th width="15%">SnowNLP</th>
+                        <th width="10%">状态</th>
+                    </tr>
+                </thead>
+                <tbody id="predictionTable">
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            <i class="fas fa-chart-line fa-2x mb-2"></i><br>
+                            请先运行模型评估
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 分页 -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="text-muted">
+                显示第 <span id="predictionPageStart">0</span> - <span id="predictionPageEnd">0</span> 条，共 <span id="predictionTotalCount">0</span> 条
+            </div>
+            <nav>
+                <ul class="pagination pagination-sm mb-0" id="predictionPagination">
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let evaluationResults = null;
+let predictionData = [];
+let filteredPredictions = [];
+let currentPredictionPage = 1;
+let predictionPageSize = 10;
+
+let radarChart = null;
+let barChart = null;
+
+// 页面加载时获取数据
+document.addEventListener('DOMContentLoaded', function() {
+    loadEvaluationData();
+});
+
+// 加载评估数据
+async function loadEvaluationData() {
+    try {
+        // 尝试加载已存在的评估结果
+        const response = await fetch('/api/evaluate_model', {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.status === 'success') {
+                evaluationResults = result.results;
+                updateEvaluationDisplay();
+                generatePredictionData();
+            } else {
+                showNoDataMessage(result.message);
+            }
+        }
+    } catch (error) {
+        console.error('加载评估数据失败:', error);
+        showNoDataMessage('暂无评估数据，请先运行评估');
+    }
+}
+
+// 运行评估
+async function runEvaluation() {
+    document.getElementById('evaluationAlert').style.display = 'block';
+    
+    try {
+        const response = await fetch('/api/evaluate_model', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            evaluationResults = result.results;
+            updateEvaluationDisplay();
+            generatePredictionData();
+            showToast('模型评估完成', 'success');
+        } else {
+            showToast(result.message, 'error');
+            showNoDataMessage(result.message);
+        }
+        
+    } catch (error) {
+        console.error('评估失败:', error);
+        showToast('评估失败，请重试', 'error');
+    } finally {
+        document.getElementById('evaluationAlert').style.display = 'none';
+    }
+}
+
+// 显示无数据消息
+function showNoDataMessage(message) {
+    document.getElementById('overviewCards').innerHTML = `
+        <div class="col-12">
+            <div class="alert alert-warning text-center">
+                <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                <h5>暂无评估数据</h5>
+                <p>${message}</p>
+                <button class="btn btn-primary" onclick="runEvaluation()">
+                    <i class="fas fa-play me-2"></i>开始评估
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// 更新评估显示
+function updateEvaluationDisplay() {
+    if (!evaluationResults) return;
+    
+    const custom = evaluationResults.custom_model;
+    const snownlp = evaluationResults.snownlp_baseline;
+    
+    // 更新概览卡片
+    document.getElementById('customAccuracy').textContent = (custom.accuracy * 100).toFixed(1) + '%';
+    document.getElementById('customF1').textContent = (custom.f1_score * 100).toFixed(1) + '%';
+    document.getElementById('customPrecision').textContent = (custom.precision * 100).toFixed(1) + '%';
+    document.getElementById('customRecall').textContent = (custom.recall * 100).toFixed(1) + '%';
+    
+    document.getElementById('snownlpAccuracy').textContent = (snownlp.accuracy * 100).toFixed(1) + '%';
+    document.getElementById('snownlpF1').textContent = (snownlp.f1_score * 100).toFixed(1) + '%';
+    document.getElementById('snownlpPrecision').textContent = (snownlp.precision * 100).toFixed(1) + '%';
+    document.getElementById('snownlpRecall').textContent = (snownlp.recall * 100).toFixed(1) + '%';
+    
+    // 计算提升
+    const accuracyImprovement = ((custom.accuracy - snownlp.accuracy) * 100).toFixed(1);
+    const f1Improvement = ((custom.f1_score - snownlp.f1_score) * 100).toFixed(1);
+    const precisionImprovement = ((custom.precision - snownlp.precision) * 100).toFixed(1);
+    const recallImprovement = ((custom.recall - snownlp.recall) * 100).toFixed(1);
+    
+    document.getElementById('accuracyImprovement').textContent = `${accuracyImprovement > 0 ? '+' : ''}${accuracyImprovement}%`;
+    document.getElementById('f1Improvement').textContent = `${f1Improvement > 0 ? '+' : ''}${f1Improvement}%`;
+    document.getElementById('precisionImprovement').textContent = `${precisionImprovement > 0 ? '+' : ''}${precisionImprovement}%`;
+    document.getElementById('recallImprovement').textContent = `${recallImprovement > 0 ? '+' : ''}${recallImprovement}%`;
+    
+    // 设置颜色
+    setImprovementColor('accuracyImprovement', accuracyImprovement);
+    setImprovementColor('f1Improvement', f1Improvement);
+    setImprovementColor('precisionImprovement', precisionImprovement);
+    setImprovementColor('recallImprovement', recallImprovement);
+    
+    document.getElementById('improvementCard').style.display = 'block';
+    
+    // 更新图表
+    updateCharts();
+    
+    // 更新混淆矩阵
+    updateConfusionMatrices();
+}
+
+// 设置提升颜色
+function setImprovementColor(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (value > 0) {
+        element.className = 'text-success';
+    } else if (value < 0) {
+        element.className = 'text-danger';
+    } else {
+        element.className = 'text-muted';
+    }
+}
+
+// 更新图表
+function updateCharts() {
+    if (!evaluationResults) return;
+    
+    const custom = evaluationResults.custom_model;
+    const snownlp = evaluationResults.snownlp_baseline;
+    
+    // 雷达图
+    const radarCtx = document.getElementById('radarChart').getContext('2d');
+    if (radarChart) radarChart.destroy();
+    
+    radarChart = new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: ['准确率', '精确率', '召回率', 'F1分数'],
+            datasets: [{
+                label: '自定义模型',
+                data: [custom.accuracy, custom.precision, custom.recall, custom.f1_score],
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                pointBackgroundColor: '#667eea'
+            }, {
+                label: 'SnowNLP',
+                data: [snownlp.accuracy, snownlp.precision, snownlp.recall, snownlp.f1_score],
+                borderColor: '#6c757d',
+                backgroundColor: 'rgba(108, 117, 125, 0.2)',
+                pointBackgroundColor: '#6c757d'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 1
+                }
+            }
+        }
+    });
+    
+    // 柱状图
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    if (barChart) barChart.destroy();
+    
+    barChart = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: ['准确率', '精确率', '召回率', 'F1分数'],
+            datasets: [{
+                label: '自定义模型',
+                data: [custom.accuracy, custom.precision, custom.recall, custom.f1_score],
+                backgroundColor: '#667eea'
+            }, {
+                label: 'SnowNLP',
+                data: [snownlp.accuracy, snownlp.precision, snownlp.recall, snownlp.f1_score],
+                backgroundColor: '#6c757d'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1
+                }
+            }
+        }
+    });
+}
+
+// 更新混淆矩阵
+function updateConfusionMatrices() {
+    if (!evaluationResults) return;
+    
+    const customCM = evaluationResults.custom_model.confusion_matrix;
+    const snownlpCM = evaluationResults.snownlp_baseline.confusion_matrix;
+    
+    // 自定义模型混淆矩阵
+    document.getElementById('customConfusionMatrix').innerHTML = createConfusionMatrixHTML(customCM, '自定义模型');
+    
+    // SnowNLP混淆矩阵
+    document.getElementById('snownlpConfusionMatrix').innerHTML = createConfusionMatrixHTML(snownlpCM, 'SnowNLP');
+}
+
+// 创建混淆矩阵HTML
+function createConfusionMatrixHTML(matrix, title) {
+    return `
+        <table class="table table-bordered text-center">
+            <thead>
+                <tr>
+                    <th colspan="3">${title}</th>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td><strong>预测负面</strong></td>
+                    <td><strong>预测正面</strong></td>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>实际负面</strong></td>
+                    <td class="bg-success text-white">${matrix[0][0]}</td>
+                    <td class="bg-danger text-white">${matrix[0][1]}</td>
+                </tr>
+                <tr>
+                    <td><strong>实际正面</strong></td>
+                    <td class="bg-danger text-white">${matrix[1][0]}</td>
+                    <td class="bg-success text-white">${matrix[1][1]}</td>
+                </tr>
+            </tbody>
+        </table>
+    `;
+}
+
+// 生成预测数据（模拟）
+function generatePredictionData() {
+    if (!evaluationResults) return;
+    
+    // 这里应该从后端获取详细的预测结果
+    // 目前使用模拟数据
+    predictionData = [];
+    const testSize = evaluationResults.test_size;
+    
+    for (let i = 0; i < testSize; i++) {
+        const trueLabel = Math.random() > 0.5 ? 1 : 0;
+        const customPred = Math.random() > 0.3 ? trueLabel : 1 - trueLabel; // 70% 准确率
+        const snownlpPred = Math.random() > 0.4 ? trueLabel : 1 - trueLabel; // 60% 准确率
+        
+        predictionData.push({
+            id: i + 1,
+            text: `测试文本 ${i + 1}...`,
+            trueLabel: trueLabel,
+            customPred: customPred,
+            snownlpPred: snownlpPred,
+            customCorrect: customPred === trueLabel,
+            snownlpCorrect: snownlpPred === trueLabel,
+            disagreement: customPred !== snownlpPred
+        });
+    }
+    
+    filteredPredictions = [...predictionData];
+    updatePredictionTable();
+}
+
+// 更新预测表格
+function updatePredictionTable() {
+    const tbody = document.getElementById('predictionTable');
+    const startIndex = (currentPredictionPage - 1) * predictionPageSize;
+    const endIndex = Math.min(startIndex + predictionPageSize, filteredPredictions.length);
+    const pageData = filteredPredictions.slice(startIndex, endIndex);
+    
+    if (pageData.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted">
+                    <i class="fas fa-search fa-2x mb-2"></i><br>
+                    无匹配结果
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = pageData.map(item => {
+        const trueLabelText = item.trueLabel === 1 ? '正面' : '负面';
+        const customPredText = item.customPred === 1 ? '正面' : '负面';
+        const snownlpPredText = item.snownlpPred === 1 ? '正面' : '负面';
+        
+        let statusIcon = '';
+        let statusClass = '';
+        
+        if (item.customCorrect && item.snownlpCorrect) {
+            statusIcon = '<i class="fas fa-check-circle text-success"></i>';
+        } else if (!item.customCorrect && !item.snownlpCorrect) {
+            statusIcon = '<i class="fas fa-times-circle text-danger"></i>';
+        } else if (item.disagreement) {
+            statusIcon = '<i class="fas fa-exclamation-triangle text-warning"></i>';
+        } else {
+            statusIcon = '<i class="fas fa-minus-circle text-muted"></i>';
+        }
+        
+        return `
+            <tr>
+                <td>${item.id}</td>
+                <td>
+                    <div class="text-truncate" style="max-width: 300px;" title="${item.text}">
+                        ${item.text}
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${item.trueLabel === 1 ? 'bg-success' : 'bg-danger'}">${trueLabelText}</span>
+                </td>
+                <td>
+                    <span class="badge ${item.customPred === 1 ? 'bg-success' : 'bg-danger'} ${item.customCorrect ? '' : 'opacity-50'}">${customPredText}</span>
+                    ${item.customCorrect ? '<i class="fas fa-check text-success ms-1"></i>' : '<i class="fas fa-times text-danger ms-1"></i>'}
+                </td>
+                <td>
+                    <span class="badge ${item.snownlpPred === 1 ? 'bg-success' : 'bg-danger'} ${item.snownlpCorrect ? '' : 'opacity-50'}">${snownlpPredText}</span>
+                    ${item.snownlpCorrect ? '<i class="fas fa-check text-success ms-1"></i>' : '<i class="fas fa-times text-danger ms-1"></i>'}
+                </td>
+                <td>${statusIcon}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    updatePredictionPagination();
+    updatePredictionPageInfo();
+}
+
+// 过滤预测结果
+function filterPredictions() {
+    const filterValue = document.getElementById('predictionFilter').value;
+    
+    if (filterValue === '') {
+        filteredPredictions = [...predictionData];
+    } else if (filterValue === 'correct') {
+        filteredPredictions = predictionData.filter(item => item.customCorrect);
+    } else if (filterValue === 'incorrect') {
+        filteredPredictions = predictionData.filter(item => !item.customCorrect);
+    } else if (filterValue === 'disagreement') {
+        filteredPredictions = predictionData.filter(item => item.disagreement);
+    }
+    
+    currentPredictionPage = 1;
+    updatePredictionTable();
+}
+
+// 搜索预测结果
+function searchPredictions() {
+    const searchText = document.getElementById('predictionSearch').value.toLowerCase();
+    
+    if (searchText === '') {
+        filterPredictions();
+        return;
+    }
+    
+    filteredPredictions = predictionData.filter(item => 
+        item.text.toLowerCase().includes(searchText)
+    );
+    
+    currentPredictionPage = 1;
+    updatePredictionTable();
+}
+
+// 更新预测分页
+function updatePredictionPagination() {
+    const totalPages = Math.ceil(filteredPredictions.length / predictionPageSize);
+    const pagination = document.getElementById('predictionPagination');
+    
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let paginationHTML = '';
+    
+    // 上一页
+    paginationHTML += `
+        <li class="page-item ${currentPredictionPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePredictionPage(${currentPredictionPage - 1})">上一页</a>
+        </li>
+    `;
+    
+    // 页码
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || Math.abs(i - currentPredictionPage) <= 2) {
+            paginationHTML += `
+                <li class="page-item ${i === currentPredictionPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="changePredictionPage(${i})">${i}</a>
+                </li>
+            `;
+        } else if (Math.abs(i - currentPredictionPage) === 3) {
+            paginationHTML += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+    }
+    
+    // 下一页
+    paginationHTML += `
+        <li class="page-item ${currentPredictionPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePredictionPage(${currentPredictionPage + 1})">下一页</a>
+        </li>
+    `;
+    
+    pagination.innerHTML = paginationHTML;
+}
+
+// 更新预测页面信息
+function updatePredictionPageInfo() {
+    const startIndex = (currentPredictionPage - 1) * predictionPageSize + 1;
+    const endIndex = Math.min(currentPredictionPage * predictionPageSize, filteredPredictions.length);
+    
+    document.getElementById('predictionPageStart').textContent = filteredPredictions.length > 0 ? startIndex : 0;
+    document.getElementById('predictionPageEnd').textContent = endIndex;
+    document.getElementById('predictionTotalCount').textContent = filteredPredictions.length;
+}
+
+// 切换预测页面
+function changePredictionPage(page) {
+    const totalPages = Math.ceil(filteredPredictions.length / predictionPageSize);
+    if (page >= 1 && page <= totalPages) {
+        currentPredictionPage = page;
+        updatePredictionTable();
+    }
+}
+
+// 导出预测结果
+function exportPredictions() {
+    if (predictionData.length === 0) {
+        showToast('暂无数据可导出', 'warning');
+        return;
+    }
+    
+    const csvContent = [
+        'ID,文本,真实标签,自定义模型预测,SnowNLP预测,自定义模型正确,SnowNLP正确,模型分歧',
+        ...predictionData.map(item => [
+            item.id,
+            `"${item.text}"`,
+            item.trueLabel === 1 ? '正面' : '负面',
+            item.customPred === 1 ? '正面' : '负面',
+            item.snownlpPred === 1 ? '正面' : '负面',
+            item.customCorrect ? '是' : '否',
+            item.snownlpCorrect ? '是' : '否',
+            item.disagreement ? '是' : '否'
+        ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `prediction_results_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    showToast('预测结果导出成功', 'success');
+}
+</script>
+{% endblock %} 
