@@ -869,14 +869,6 @@ SOFTWARE.
 
 特别感谢所有提交 Issue、PR 和提供反馈的社区成员！
 
-## 📞 联系我们
-
-- 📧 **邮箱**：support@sentiment-analysis.com
-- 💬 **QQ 群**：123456789 (情感分析交流群)
-- 🐛 **Bug 报告**：[GitHub Issues](https://github.com/your-username/sentiment-analysis/issues)
-- 💡 **功能建议**：[GitHub Discussions](https://github.com/your-username/sentiment-analysis/discussions)
-- 📖 **在线文档**：[文档中心](https://docs.sentiment-analysis.com)
-
 ---
 
 <div align="center">
