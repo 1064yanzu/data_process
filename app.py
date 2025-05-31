@@ -710,18 +710,36 @@ class SentimentAnalyzer:
 analyzer = SentimentAnalyzer()
 
 def load_llm_config():
-    """加载LLM配置"""
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {
+    """加载LLM配置，优先使用环境变量"""
+    # 默认配置
+    config = {
         'api_type': 'openai',
-        'base_url': '',
-        'api_key': '',
-        'model_name': 'gpt-3.5-turbo',
-        'timeout': 30,
-        'max_concurrent': 5
+        'base_url': os.getenv('OPENAI_BASE_URL', ''),
+        'api_key': os.getenv('OPENAI_API_KEY', ''),
+        'model_name': os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo'),
+        'timeout': int(os.getenv('API_TIMEOUT', '30')),
+        'max_concurrent': int(os.getenv('MAX_CONCURRENT', '5'))
     }
+    
+    # 如果存在配置文件，合并配置（环境变量优先）
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                file_config = json.load(f)
+                # 只有当环境变量为空时才使用文件配置
+                for key, value in file_config.items():
+                    if key in config and not config[key]:
+                        config[key] = value
+        except Exception as e:
+            logger.warning(f"读取配置文件失败: {e}")
+    
+    # 记录API密钥状态（不记录具体值）
+    if config['api_key']:
+        logger.info(f"API密钥已配置 (长度: {len(config['api_key'])})")
+    else:
+        logger.warning("未配置API密钥，将使用SnowNLP作为后备")
+    
+    return config
 
 def save_llm_config(config):
     """保存LLM配置"""

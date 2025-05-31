@@ -1,0 +1,85 @@
+# === 环境配置和密钥文件 ===
+.env
+*.env
+config.env
+.env.local
+.env.development
+.env.production
+
+# === API密钥配置文件 ===
+data/llm_config.json
+llm_config.json
+api_keys.json
+secrets.json
+
+# === 数据库和存储文件 ===
+*.db
+*.sqlite
+*.sqlite3
+data/sentiment_db.sqlite
+
+# === 训练模型文件 ===
+models/*.pkl
+*.pkl
+*.model
+
+# === 数据文件 ===
+data/sentiment_data.json
+sentiment_data.json
+data/backups/
+data/versions/
+
+# === 上传和导出文件 ===
+uploads/
+exports/
+*.csv
+*.xlsx
+*.json
+!示例数据.json
+!config.env.example
+
+# === Python 编译文件 ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# === 虚拟环境 ===
+venv/
+env/
+ENV/
+.venv/
+
+# === IDE 配置文件 ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === 日志文件 ===
+*.log
+logs/
+
+# === 临时文件 ===
+.DS_Store
+Thumbs.db
+.tmp/
+.temp/
+
+# === 备份文件 ===
+*.bak
+*.backup
+*~
+
+# === 系统文件 ===
+.cache/
+.pytest_cache/
+
+# === Node.js (如果使用) ===
+node_modules/
+npm-debug.log*
+
+# === 包构建文件 ===
+build/
+dist/
+*.egg-info/ 
